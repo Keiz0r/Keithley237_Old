@@ -41,6 +41,7 @@ void connectDevice() {
 
 void disconnectDevice() {
 	status = viClose(instr);
+	status = viClose(defaultRM);
 	std::cout << "Disconnected instrument: " << Devicename << std::endl;
 }
 
@@ -49,7 +50,7 @@ void displayStatus() {
 	std::cout << "Binary Status "<< std::bitset<8>(status) << std::endl;
 }
 
-void writeToDevice(char *msg) {
+void writeToDevice(const char *msg) {
 	status = viWrite(instr, (ViBuf)msg, (ViUInt32)strlen(msg), &writeCount);
 
 	//"X" stands for Execute command all the time
@@ -111,7 +112,7 @@ void read1FromDevice() {
 
 	status = viRead(instr, buffer, bytesToRead, &retCount);
 	std::cout << "retCount: "  << retCount << " bytes" << std::endl;
-	std::cout << "Data in buffer: " << buffer << std::endl;
+	std::cout << "Data read" << std::endl;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
 	Sbuffer = reinterpret_cast<char const*>(buffer);
 	//Format data into column
@@ -136,7 +137,7 @@ void read2FromDevice() {
 
 	status = viRead(instr, buffer, bytesToRead, &retCount);
 	std::cout << "retCount: " << retCount << " bytes" << std::endl;
-	std::cout << "Data in buffer: " << buffer << std::endl;
+	std::cout << "Data read" << std::endl;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
 	Sbuffer = reinterpret_cast<char const*>(buffer);
 	//Format data into column
@@ -166,7 +167,7 @@ void IV_meas() {
 	std::cout << "Amount of runs?\n";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
-	for (int i = 0; i < amountOfRuns; i++) {
+	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
 		status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
@@ -174,7 +175,7 @@ void IV_meas() {
 		status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-		status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
 		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q1,0,-2.2,0.1,0,400X", (ViUInt32)strlen("Q1,0,-2.2,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q7,-2.1,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,-2.1,0.1,0,400X"), &writeCount);
@@ -194,6 +195,31 @@ void IV_meas() {
 		std::this_thread::sleep_for(std::chrono::seconds(50));
 		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 		read2FromDevice();
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
+void sweepmeas() {
+	std::cout << "Amount of runs?\n";
+	int amountOfRuns;
+	std::cin >> amountOfRuns;
+	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
+	for (int i = 0; i < amountOfRuns; ++i) {
+		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+		//read1FromDevice();
+		status = viRead(instr, buffer, 1000, &retCount);
+		std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		//Format data into column
+		int position = Sbuffer.find(",");
+		while (position != std::string::npos) {
+			Sbuffer.replace(position, 1, "\n");
+			position = Sbuffer.find(",", position + 1);
+		}
+		Sbuffer.erase(Sbuffer.size() - 1);
+		outputFileName << Sbuffer;
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -235,13 +261,16 @@ int main()
 		}
 		else if (userMessage == "write") {
 			std::cin >> userMessage;
-			writeToDevice((char*)userMessage.c_str());
+			writeToDevice(userMessage.c_str());	//made arg const char instead of char. TO TRY OUT
 		}
 		else if (userMessage == "readm") {
 			readMessageFromDevice();
 		}
 		else if (userMessage == "test") {
 			IV_meas();
+		}
+		else if (userMessage == "sweep") {
+			sweepmeas();
 		}
 		else if (userMessage == "disco") {
 			disco();
