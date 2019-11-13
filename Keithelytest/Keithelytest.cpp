@@ -200,14 +200,18 @@ void IV_meas() {
 }
 
 void sweepmeas() {
+	//runs the manually loaded sweep. does not change the CC, which might be important
 	std::cout << "Amount of runs?\n";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
+	std::cout << "Pause Time?\n";
+	int pauseTime;
+	std::cin >> pauseTime;
 	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+		std::this_thread::sleep_for(std::chrono::seconds(pauseTime));
 		//read1FromDevice();
 		status = viRead(instr, buffer, 1000, &retCount);
 		std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
@@ -222,6 +226,147 @@ void sweepmeas() {
 		outputFileName << Sbuffer;
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
+void Itmeas() {
+	std::cout << "I(t) measurement mode\n";
+	std::cout << "Voltage?\n";
+	char ItVoltage[5];
+	std::cin >> ItVoltage;
+	char str1[20] = "B";
+	char str2[6] = ",0,0X";
+	strcat_s(str1, ItVoltage);
+	strcat_s(str1, str2);
+	std::cout << "Compliance? XE-Y\n";
+	char currentCompliance[10];
+	std::cin >> currentCompliance;
+	char str3[20] = "L";
+	char str4[4] = ",0X";
+	strcat_s(str3, currentCompliance);
+	strcat_s(str3, str4);
+	std::ofstream outputFileName("KeithIt.txt", std::ios::app);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"G15,0,0X", (ViUInt32)strlen("G15,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);
+	status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);	//CC Settings
+	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	while (1) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		float measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0,36);//remove 1st letters
+		outputFileName << measTime << "\t"<< Sbuffer << std::endl;
+	}
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+}
+
+
+void forming() {
+	std::cout << "Forming mode\n";
+	bool next_step = false;
+	float measTime;
+	float target;
+	std::string::size_type sz;
+	std::ofstream outputFileName("Forming.txt", std::ios::app);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"G15,0,0X", (ViUInt32)strlen("G15,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0.3,0,0X", (ViUInt32)strlen("B0.3,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"L5E-3,0X", (ViUInt32)strlen("L5E-3,0X"), &writeCount);	//CC Settings
+	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	//show initial state
+	for (int i = 0; i <= 25; ++i) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+	}
+	status = viWrite(instr, (ViBuf)"B3,0,0X", (ViUInt32)strlen("B3,0,0X"), &writeCount);
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	while (!next_step) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+		target = std::stof(Sbuffer, &sz);
+		if (target >= 0.0008f) {
+			next_step = true;
+			std::cout << "Step 1 complete!\n";
+		}
+	}
+	next_step = false;
+	status = viWrite(instr, (ViBuf)"B5,0,0X", (ViUInt32)strlen("B5,0,0X"), &writeCount);
+	while (!next_step) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+		target = std::stof(Sbuffer, &sz);
+		if (target >= 0.0049f) {
+			next_step = true;
+			std::cout << "Step 2 complete!\n";
+		}
+	}
+	next_step = false;
+	status = viWrite(instr, (ViBuf)"B-3,0,0X", (ViUInt32)strlen("B-2,0,0X"), &writeCount);
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+	while (!next_step) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+		target = std::stof(Sbuffer, &sz);
+		if (target >= 0.003f) {
+			next_step = true;
+			std::cout << "Negative step complete!\n";
+		}
+	}
+	//show formed state
+	status = viWrite(instr, (ViBuf)"B0.3,0,0X", (ViUInt32)strlen("B0.3,0,0X"), &writeCount);
+	for (int i = 0; i <= 25; ++i) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+	}
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	std::cout << "Forming complete!\n";
 }
 
 void disco() {
@@ -246,7 +391,8 @@ void disco() {
 int main()
 {
 	status = viOpenDefaultRM(&defaultRM);
-	
+	connectDevice();
+
 	while (userMessage != "exit") {
 		std::cin >> userMessage;
 
@@ -274,6 +420,12 @@ int main()
 		}
 		else if (userMessage == "disco") {
 			disco();
+		}
+		else if (userMessage == "It") {
+			Itmeas();
+		}
+		else if (userMessage == "forming") {
+			forming();
 		}
 		else {
 			std::cout << "Wrong input\n";
