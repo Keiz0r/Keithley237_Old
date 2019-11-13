@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <thread>
 #include <chrono>
+#include "Instrument.h"
 
 std::string userMessage;
 
@@ -16,8 +17,8 @@ static ViUInt32 retCount;
 static unsigned char buffer[10000];	// buffer size for data coming from the device
 int dataToRead;
 int bytesToRead;
-std::string Sbuffer(reinterpret_cast<char const*>(buffer));
-std::string Devicename = "GPIB0::2::INSTR";
+std::string Sbuffer;
+static const char* Devicename = "GPIB0::2::INSTR";
 
 
 void deviceSettings() {
@@ -34,7 +35,7 @@ void deviceSettings() {
 }
 
 void connectDevice() {
-	status = viOpen(defaultRM, (char*)Devicename.c_str(), VI_NULL, VI_NULL, &instr);
+	status = viOpen(defaultRM, Devicename, VI_NULL, VI_NULL, &instr);
 	std::cout << "Connecting to instrument: " << Devicename << std::endl;
 	deviceSettings();	// Apply preset
 }
@@ -390,9 +391,10 @@ void disco() {
 
 int main()
 {
+	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
 	status = viOpenDefaultRM(&defaultRM);
 	connectDevice();
-
+	
 	while (userMessage != "exit") {
 		std::cin >> userMessage;
 
@@ -407,7 +409,7 @@ int main()
 		}
 		else if (userMessage == "write") {
 			std::cin >> userMessage;
-			writeToDevice(userMessage.c_str());	//made arg const char instead of char. TO TRY OUT
+			writeToDevice(userMessage.c_str());
 		}
 		else if (userMessage == "readm") {
 			readMessageFromDevice();
@@ -428,7 +430,9 @@ int main()
 			forming();
 		}
 		else {
-			std::cout << "Wrong input\n";
+			if (userMessage != "exit") {
+				std::cout << "Wrong input\n";
+			}
 		}
 	}
 
