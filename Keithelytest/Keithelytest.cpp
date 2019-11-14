@@ -389,12 +389,20 @@ void disco() {
 	std::this_thread::sleep_for(std::chrono::seconds(5));
 }
 
+void printProgress(float percentage) {
+	std::string str = "............................................................";
+	int value = (int)(percentage * 100);
+	int progressLength = (int)(percentage * str.length());
+	std::cout << "\r" << std::setw(3) << value <<"% [" << std::setw(60) << std::left << str.substr(0,progressLength) << "]";
+	std::cout.flush();
+}
+
 int main()
 {
 	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
 	status = viOpenDefaultRM(&defaultRM);
 	connectDevice();
-	
+
 	while (userMessage != "exit") {
 		std::cin >> userMessage;
 
