@@ -112,7 +112,7 @@ void read1FromDevice() {
 	std::cout << "Bytes to read: " << bytesToRead << std::endl;
 
 	status = viRead(instr, buffer, bytesToRead, &retCount);
-	std::cout << "retCount: "  << retCount << " bytes" << std::endl;
+	std::cout << "retCount: " << retCount << " bytes" << std::endl;
 	std::cout << "Data read" << std::endl;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
 	Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -148,6 +148,31 @@ void read2FromDevice() {
 		position = Sbuffer.find(",", position + 1);
 	}
 	Sbuffer.erase(Sbuffer.size() - 13);
+	outputFileName << Sbuffer;
+}
+
+void read3FromDevice() {
+	status = viWrite(instr, (ViBuf)"U11X", (ViUInt32)strlen("U11X"), &writeCount);
+	status = viRead(instr, buffer, 100, &retCount);	//reading how much data is available
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	Sbuffer.assign(Sbuffer, 3, 4);
+	dataToRead = std::stoi(Sbuffer);
+	bytesToRead = dataToRead * 13;
+	std::cout << "Data to read: " << dataToRead << std::endl;
+	std::cout << "Bytes to read: " << bytesToRead << std::endl;
+
+	status = viRead(instr, buffer, bytesToRead, &retCount);
+	std::cout << "retCount: " << retCount << " bytes" << std::endl;
+	std::cout << "Data read" << std::endl;
+	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	//Format data into column
+	int position = Sbuffer.find(",");
+	while (position != std::string::npos) {
+		Sbuffer.replace(position, 1, "\n");
+		position = Sbuffer.find(",", position + 1);
+	}
+	Sbuffer.erase(Sbuffer.size() - 4*13);
 	outputFileName << Sbuffer;
 }
 
@@ -292,7 +317,7 @@ void forming() {
 	status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	//show initial state
-	for (int i = 0; i <= 25; ++i) {
+	for (int i = 0; i <= 15; ++i) {
 		status = viRead(instr, buffer, 100, &retCount);
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 		std::chrono::duration<float> duration = now - start;
@@ -397,6 +422,113 @@ void printProgress(float percentage) {
 	std::cout.flush();
 }
 
+void small_device_pulsed_mode() {
+	std::cout << "Amount of runs?\n";
+	int amountOfRuns;
+	std::cin >> amountOfRuns;
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"L0.4E-3,7X", (ViUInt32)strlen("L0.4E-3,7X"), &writeCount);	//CC Settings
+	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
+	for (int i = 0; i < amountOfRuns; ++i) {
+		status = viWrite(instr, (ViBuf)"L0.4E-3,7X", (ViUInt32)strlen("L0.4E-3,7X"), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);	//create sweep
+		//status = viWrite(instr, (ViBuf)"Q9,8,2,1,1000,1X", (ViUInt32)strlen("Q9,5,2,1,1000,1X"), &writeCount);	//setreset for better operation
+		status = viWrite(instr, (ViBuf)"Q9,-4,2,1,500,500X", (ViUInt32)strlen("Q9,-4,2,1,500,500X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q9,0.3,2,1,500,500X", (ViUInt32)strlen("Q9,0.3,2,1,500,500X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		read1FromDevice();
+		
+		//status = viWrite(instr, (ViBuf)"L1E-2,8X", (ViUInt32)strlen("L1E-3,8X"), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"Q3,3,2,1,100,2000X", (ViUInt32)strlen("Q3,3,2,1,100,2000X"), &writeCount);	//create sweep2
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+		//std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		read3FromDevice();
+		
+		std::cout << " - - - - - - Run #" << i+1 << " complete - - - - - - \n";
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
+void smallDeviceForming(){
+	float measTime;
+	float target;
+	bool next_step = false;
+	std::string::size_type sz;
+	std::ofstream outputFileName("SmallDeviceForming.txt", std::ios::app);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"L0.4E-3,7X", (ViUInt32)strlen("L0.4E-3,7X"), &writeCount);	//CC Settings
+	status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"G15,0,0X", (ViUInt32)strlen("G15,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0.3,0,0X", (ViUInt32)strlen("B0.3,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+
+	//show initial state
+	for (int i = 0; i <= 15; ++i) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+	}
+	status = viWrite(instr, (ViBuf)"B3,0,0X", (ViUInt32)strlen("B3,0,0X"), &writeCount);
+
+	while (!next_step) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+		target = std::stof(Sbuffer, &sz);
+		if (target >= 0.00038f) {
+			next_step = true;
+			std::cout << "Step 1 complete!\n";
+		}
+	}
+
+
+
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"L2E-3,8X", (ViUInt32)strlen("L2E-3,8X"), &writeCount);	//CC Settings
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+	status = viWrite(instr, (ViBuf)"B0.3,0,0X", (ViUInt32)strlen("B0.3,0,0X"), &writeCount);
+	//show final state
+	for (int i = 0; i <= 15; ++i) {
+		status = viRead(instr, buffer, 100, &retCount);
+		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+		std::chrono::duration<float> duration = now - start;
+		measTime = duration.count();
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
+	}
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	std::cout << " - - - - - - Small device forming complete - - - - - - \n";
+}
+
 int main()
 {
 	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
@@ -436,6 +568,12 @@ int main()
 		}
 		else if (userMessage == "forming") {
 			forming();
+		}
+		else if (userMessage == "sdforming") {
+			smallDeviceForming();
+		}
+		else if (userMessage == "sdp") {
+			small_device_pulsed_mode();
 		}
 		else {
 			if (userMessage != "exit") {
