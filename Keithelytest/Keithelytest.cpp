@@ -147,7 +147,7 @@ void read2FromDevice() {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
-	Sbuffer.assign(Sbuffer, 0, 100 * 13);
+	Sbuffer.assign(Sbuffer, 0, 80 * 13);
 	outputFileName << Sbuffer;
 }
 
@@ -213,7 +213,7 @@ void IV_meas() {
 		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(50));
+		std::this_thread::sleep_for(std::chrono::seconds(40));
 	}
 
 	for (int i = 0; i < amountOfRuns; ++i) {
@@ -229,12 +229,12 @@ void IV_meas() {
 		status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
 		read1FromDevice();
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,5,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,4.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,2.9,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,2.9,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(50));
+		std::this_thread::sleep_for(std::chrono::seconds(45));
 		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 		read2FromDevice();
 	}
