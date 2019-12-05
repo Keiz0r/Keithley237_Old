@@ -122,7 +122,7 @@ void read1FromDevice() {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
-
+	Sbuffer.assign(Sbuffer, 0, 61*13);
 	outputFileName << Sbuffer;
 }
 
@@ -147,7 +147,7 @@ void read2FromDevice() {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
-	Sbuffer.erase(Sbuffer.size() - 13);
+	Sbuffer.assign(Sbuffer, 0, 100 * 13);
 	outputFileName << Sbuffer;
 }
 
@@ -193,18 +193,34 @@ void IV_meas() {
 	std::cout << "Amount of runs?\n";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
+	bool make_prep = false;
+	std::cout << "Do prep? 1/0\n";
+	std::cin >> make_prep;
+	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
+	status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+
+	if (make_prep) {
+		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		std::this_thread::sleep_for(std::chrono::seconds(50));
+	}
+
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-		status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
 		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
-		status = viWrite(instr, (ViBuf)"Q1,0,-2.2,0.1,0,400X", (ViUInt32)strlen("Q1,0,-2.2,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,-2.1,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,-2.1,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
@@ -213,43 +229,14 @@ void IV_meas() {
 		status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
 		read1FromDevice();
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,2.2,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,2.2,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,2.1,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,2.1,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0.1,5,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,4.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,2.9,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		std::this_thread::sleep_for(std::chrono::seconds(50));
 		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 		read2FromDevice();
-	}
-	std::cout << " - - - - - - Measurement complete - - - - - - \n";
-}
-
-void sweepmeas() {
-	//runs the manually loaded sweep. does not change the CC, which might be important
-	std::cout << "Amount of runs?\n";
-	int amountOfRuns;
-	std::cin >> amountOfRuns;
-	std::cout << "Pause Time?\n";
-	int pauseTime;
-	std::cin >> pauseTime;
-	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
-	for (int i = 0; i < amountOfRuns; ++i) {
-		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(pauseTime));
-		//read1FromDevice();
-		status = viRead(instr, buffer, 1000, &retCount);
-		std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		//Format data into column
-		int position = Sbuffer.find(",");
-		while (position != std::string::npos) {
-			Sbuffer.replace(position, 1, "\n");
-			position = Sbuffer.find(",", position + 1);
-		}
-		Sbuffer.erase(Sbuffer.size() - 1);
-		outputFileName << Sbuffer;
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -937,7 +924,7 @@ void small_device_pulsed_mode_proper_forming() {
 	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 	for (int i = 0; i < amountOfRuns; ++i) {
-		status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"L0.2E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,-3,2,1,300,500X", (ViUInt32)strlen("Q9,-4,2,1,500,500X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -973,7 +960,6 @@ void small_device_pulsed_mode_proper_forming() {
 		Sbuffer.assign(Sbuffer, 0, 26);
 		outputFileName << Sbuffer;
 
-		assist_forming_counter_file << i + 1 << " ";
 	//	std::cout << Sbuffer << std::endl;
 
 		temp3.assign(Sbuffer, 0, 12);
@@ -981,33 +967,24 @@ void small_device_pulsed_mode_proper_forming() {
 		temp2.assign(Sbuffer, 10, 2);
 	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-	//	std::cout << "Read1 current: " << failTestNum << " Amps\n";
-
-		/*
+		std::cout << "Read1 current: " << failTestNum << " Amps\n";
+		
+									//TODO implement failproof
 		if (failTestNum <= 0.00000099f) {	//Less than 1uA
 			while (!get_out) {
 				set_fail_counter++;
 				std::cout << "Read1 threshold failed\n";
-				status = viWrite(instr, (ViBuf)"Q3,3,2,1,1500,200X", (ViUInt32)strlen("Q3,5,2,1,2500,200X"), &writeCount);	//create sweep
-				status = viWrite(instr, (ViBuf)"Q9,-3,2,1,500,500X", (ViUInt32)strlen("Q9,-5,2,1,500,500X"), &writeCount);
-				status = viWrite(instr, (ViBuf)"Q9,0.3,2,1,500,500X", (ViUInt32)strlen("Q9,0.3,2,1,500,500X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"L0.2E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
+				status = viWrite(instr, (ViBuf)"Q3,4,2,1,3000,200X", (ViUInt32)strlen("Q3,4,2,1,3000,200X"), &writeCount);	//create sweep
 				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-				std::cout << "- - - - - - - Applied +5V- - - - - -\n\n";
+				std::cout << "- - - - - - - Applied +V- - - - - -\n\n";
 				std::this_thread::sleep_for(std::chrono::seconds(4));
 				std::this_thread::sleep_for(std::chrono::milliseconds(500));
-				//read3
-				status = viWrite(instr, (ViBuf)"U11X", (ViUInt32)strlen("U11X"), &writeCount);
-				status = viRead(instr, buffer, 100, &retCount);	//reading how much data is available
-				Sbuffer = reinterpret_cast<char const*>(buffer);
-				Sbuffer.assign(Sbuffer, 3, 4);
-				dataToRead = std::stoi(Sbuffer);
-				bytesToRead = dataToRead * 13;
-				//	std::cout << "Data to read: " << dataToRead << std::endl;
-				//	std::cout << "Bytes to read: " << bytesToRead << std::endl;
 
-				status = viRead(instr, buffer, 78, &retCount);
-				//	std::cout << "retCount: " << retCount << " bytes" << std::endl;
-				//	std::cout << "Data read" << std::endl;
+				//read part 1
+				status = viRead(instr, buffer, 26, &retCount);
+				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+				//std::cout << "Data read" << std::endl;
 				Sbuffer = reinterpret_cast<char const*>(buffer);
 				//Format data into column
 				position = Sbuffer.find(",");
@@ -1015,20 +992,118 @@ void small_device_pulsed_mode_proper_forming() {
 					Sbuffer.replace(position, 1, "\n");
 					position = Sbuffer.find(",", position + 1);
 				}
-				Sbuffer.assign(Sbuffer, 0, 78);
+				Sbuffer.assign(Sbuffer, 0, 26);
 				outputFileName << Sbuffer;
+				status = viWrite(instr, (ViBuf)"L0.2E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
+				status = viWrite(instr, (ViBuf)"Q3,-4,2,1,500,200X", (ViUInt32)strlen("Q3,-4,2,1,500,200X"), &writeCount);	//create sweep
+				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+				std::cout << "- - - - - - - Applied -V- - - - - -\n\n";
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+				//read part 1
+				status = viRead(instr, buffer, 26, &retCount);
+				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+				//std::cout << "Data read" << std::endl;
+				Sbuffer = reinterpret_cast<char const*>(buffer);
+				//Format data into column
+				position = Sbuffer.find(",");
+				while (position != std::string::npos) {
+					Sbuffer.replace(position, 1, "\n");
+					position = Sbuffer.find(",", position + 1);
+				}
+				Sbuffer.assign(Sbuffer, 0, 26);
+				outputFileName << Sbuffer;
+
+
+				//read part 2
+				status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
+				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+				status = viRead(instr, buffer, 26, &retCount);
+				Sbuffer = reinterpret_cast<char const*>(buffer);
+				position = Sbuffer.find(",");
+				while (position != std::string::npos) {
+					Sbuffer.replace(position, 1, "\n");
+					position = Sbuffer.find(",", position + 1);
+				}
+				Sbuffer.assign(Sbuffer, 0, 26);
+				outputFileName << Sbuffer;
+
+				assist_forming_counter_file << i + 1 << "S ";
+				//	std::cout << Sbuffer << std::endl;
+
+				temp3.assign(Sbuffer, 0, 12);
+				temp1.assign(Sbuffer, 1, 7);
+				temp2.assign(Sbuffer, 10, 2);
+				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+				std::cout << "Read1 current: " << failTestNum << " Amps\n";
+				if (failTestNum >= 0.00000099f) {
+					get_out = true;
+					std::cout << "Read1 threshold passed with help\n";
+				}
+			}
+		}
+		
+		/*		//CURRENT UP (not sure about it!)
+		if (failTestNum <= 0.00000999f ) {	//Less than 10uA
+			while (!get_out) {
+				set_fail_counter++;
+				std::cout << "Read1 threshold to be improved\n";
+				status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
+				status = viWrite(instr, (ViBuf)"Q3,3,2,1,1500,200X", (ViUInt32)strlen("Q3,5,2,1,2500,200X"), &writeCount);	//create sweep
+				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+				std::cout << "- - - - - - - Applied +V- - - - - -\n\n";
+				std::this_thread::sleep_for(std::chrono::seconds(4));
+				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+				//read part 1
+				status = viRead(instr, buffer, 26, &retCount);
+				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+				//std::cout << "Data read" << std::endl;
+				Sbuffer = reinterpret_cast<char const*>(buffer);
+				//Format data into column
+				position = Sbuffer.find(",");
+				while (position != std::string::npos) {
+					Sbuffer.replace(position, 1, "\n");
+					position = Sbuffer.find(",", position + 1);
+				}
+				Sbuffer.assign(Sbuffer, 0, 26);
+				outputFileName << Sbuffer;
+				//read part 2
+				status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
+				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+				status = viRead(instr, buffer, 26, &retCount);
+				Sbuffer = reinterpret_cast<char const*>(buffer);
+				position = Sbuffer.find(",");
+				while (position != std::string::npos) {
+					Sbuffer.replace(position, 1, "\n");
+					position = Sbuffer.find(",", position + 1);
+				}
+				Sbuffer.assign(Sbuffer, 0, 26);
+				outputFileName << Sbuffer;
+
 				assist_forming_counter_file << i + 1 << " ";
 				//	std::cout << Sbuffer << std::endl;
 
-				temp1.assign(Sbuffer, 53, 7);
-				temp2.assign(Sbuffer, 62, 2);
+				temp3.assign(Sbuffer, 0, 12);
+				temp1.assign(Sbuffer, 1, 7);
+				temp2.assign(Sbuffer, 10, 2);
+				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				//	std::cout << "Read1 current after +5V help: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
-				if (failTestNum >= 0.00000099f) {
+				std::cout << "Read1 current: " << failTestNum << " Amps\n";
+			//	if (failTestNum >= 0.00000499f) {
 					get_out = true;
-					temp3.assign(Sbuffer, 52, 12);
 					std::cout << "Read1 threshold passed with help\n";
-				}
+			//	}
 				if (set_fail_counter >= 30 && enable_healing) {	//HEALING EXPERIMENTAL
 					std::cout << "Set Failed 30 times\nPerforming healing\n";
 					while (1) {
@@ -1054,6 +1129,7 @@ void small_device_pulsed_mode_proper_forming() {
 						}
 						Sbuffer.assign(Sbuffer, 0, 26);
 
+						assist_forming_counter_file << i + 1 << "H ";
 						temp3.assign(Sbuffer, 0, 12);
 						temp1.assign(Sbuffer, 1, 7);
 						temp2.assign(Sbuffer, 10, 2);
@@ -1099,20 +1175,20 @@ void small_device_pulsed_mode_proper_forming() {
 					}
 				}
 			}
-			get_out = false;
-		}
-		else */{
+			*/
+		else {
 			std::cout << "Read1 threshold passed\n";
 		}
 		readsFileName << temp3;
+		get_out = false;
 
 		//COOLDOWN
 		if (failTestNum >= 0.000008) {	// >8uA then let it cool down
-			std::this_thread::sleep_for(std::chrono::seconds(10));
-			std::cout << "10 Second pause\n";
+			std::this_thread::sleep_for(std::chrono::seconds(4));
+			std::cout << "4 Second pause\n";
 		}
 
-		status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L3E-4,7X"), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"L4E-4,7X", (ViUInt32)strlen("L4E-4,7X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,3,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,400,1000X"), &writeCount);	//TODO modify reset voltage to possibly +4
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -1135,10 +1211,10 @@ void small_device_pulsed_mode_proper_forming() {
 
 		//read part 2
 		status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
-		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		std::this_thread::sleep_for(std::chrono::seconds(3));
+	//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 		status = viRead(instr, buffer, 26, &retCount);
 		Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -1150,7 +1226,6 @@ void small_device_pulsed_mode_proper_forming() {
 		Sbuffer.assign(Sbuffer, 0, 26);
 		outputFileName << Sbuffer;
 
-		assist_forming_counter_file << i + 1 << "R ";
 		//	std::cout << Sbuffer << std::endl;
 
 		temp3.assign(Sbuffer, 0, 12);
@@ -1159,19 +1234,19 @@ void small_device_pulsed_mode_proper_forming() {
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
 		std::cout << "Read2 current: " << failTestNum << " Amps\n";
-		/*
-		if (failTestNum >= 0.00000019f) {	//More than 0.5uA
+		
+		if (failTestNum >= 0.000000199f) {	//More than 0.2uA
 			while (!get_out) {
 				std::cout << "Read2 threshold failed\n";
 				status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
-				status = viWrite(instr, (ViBuf)"Q3,3,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"Q3,3,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
 				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-				std::cout << "- - - - - - - Applied 4mA RESET- - - - - -\n\n";
-				std::this_thread::sleep_for(std::chrono::seconds(1));
-				std::this_thread::sleep_for(std::chrono::milliseconds(500));
+				std::cout << "- - - - - - - Applied 1mA CC RESET- - - - - -\n\n";
+				std::this_thread::sleep_for(std::chrono::seconds(3));
+			//	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 				//read part 1
 
-				status = viRead(instr, buffer, bytesToRead, &retCount);
+				status = viRead(instr, buffer, 26, &retCount);
 				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
 				//std::cout << "Data read" << std::endl;
 				Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -1186,12 +1261,12 @@ void small_device_pulsed_mode_proper_forming() {
 
 				//read part 2
 				status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
-				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
 				status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-				std::this_thread::sleep_for(std::chrono::seconds(1));
-				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+				std::this_thread::sleep_for(std::chrono::seconds(3));
+			//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-				status = viRead(instr, buffer, bytesToRead, &retCount);
+				status = viRead(instr, buffer, 26, &retCount);
 				Sbuffer = reinterpret_cast<char const*>(buffer);
 				position = Sbuffer.find(",");
 				while (position != std::string::npos) {
@@ -1209,26 +1284,27 @@ void small_device_pulsed_mode_proper_forming() {
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+				std::cout << "Read2 current after 1mA RESET: " << failTestNum << " Amps\n";
 
 				if (failTestNum <= 0.00000019f) {
 					get_out = true;
 					std::cout << "Read2 threshold passed with help1\n";
 				}
+				
 				else {	//help2
 					std::cout << "Read2 threshold failed\n";
-					status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
+					status = viWrite(instr, (ViBuf)"L1E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
 					status = viWrite(instr, (ViBuf)"Q3,3,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
 					status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-					std::cout << "- - - - - - - Applied 50mA RESET- - - - - -\n\n";
-					std::this_thread::sleep_for(std::chrono::seconds(1));
-					std::this_thread::sleep_for(std::chrono::milliseconds(600));
+					std::cout << "- - - - - - - Applied 10mA RESET- - - - - -\n\n";
+					std::this_thread::sleep_for(std::chrono::seconds(3));
+				//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
 
 					//NEED 2 parts, so I don''t get "00.0...1"
 					//read part 1
 
-					status = viRead(instr, buffer, bytesToRead, &retCount);
+					status = viRead(instr, buffer, 26, &retCount);
 					//std::cout << "retCount: " << retCount << " bytes" << std::endl;
 					//std::cout << "Data read" << std::endl;
 					Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -1245,10 +1321,10 @@ void small_device_pulsed_mode_proper_forming() {
 					status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
 					status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
 					status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-					std::this_thread::sleep_for(std::chrono::seconds(1));
-					std::this_thread::sleep_for(std::chrono::milliseconds(300));
+					std::this_thread::sleep_for(std::chrono::seconds(3));
+				//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-					status = viRead(instr, buffer, bytesToRead, &retCount);
+					status = viRead(instr, buffer, 26, &retCount);
 					Sbuffer = reinterpret_cast<char const*>(buffer);
 					position = Sbuffer.find(",");
 					while (position != std::string::npos) {
@@ -1266,25 +1342,27 @@ void small_device_pulsed_mode_proper_forming() {
 					temp2.assign(Sbuffer, 10, 2);
 					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 					failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-					//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+					std::cout << "Read2 current after 10mA RESET: " << failTestNum << " Amps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
 						std::cout << "Read2 threshold passed with help2\n";
 					}
+
+					
 					else {	//help3
 						std::cout << "Read2 threshold failed\n";
 						status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
-						status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
+						status = viWrite(instr, (ViBuf)"Q3,4,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
 						status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-						std::cout << "- - - - - - - Applied 50mA, 5V RESET- - - - - -\n\n";
-						std::this_thread::sleep_for(std::chrono::seconds(1));
-						std::this_thread::sleep_for(std::chrono::milliseconds(600));
+						std::cout << "- - - - - - - Applied 50mA, 4V RESET- - - - - -\n\n";
+						std::this_thread::sleep_for(std::chrono::seconds(3));
+					//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
 
 						//read3
 
-						status = viRead(instr, buffer, bytesToRead, &retCount);
+						status = viRead(instr, buffer, 26, &retCount);
 						Sbuffer = reinterpret_cast<char const*>(buffer);
 						position = Sbuffer.find(",");
 						while (position != std::string::npos) {
@@ -1298,10 +1376,10 @@ void small_device_pulsed_mode_proper_forming() {
 						status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
 						status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
 						status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-						std::this_thread::sleep_for(std::chrono::seconds(1));
-						std::this_thread::sleep_for(std::chrono::milliseconds(300));
+						std::this_thread::sleep_for(std::chrono::seconds(3));
+					//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-						status = viRead(instr, buffer, bytesToRead, &retCount);
+						status = viRead(instr, buffer, 26, &retCount);
 						Sbuffer = reinterpret_cast<char const*>(buffer);
 						position = Sbuffer.find(",");
 						while (position != std::string::npos) {
@@ -1320,12 +1398,13 @@ void small_device_pulsed_mode_proper_forming() {
 
 						//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 						failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-						//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+						std::cout << "Read2 current after 50mA RESET: " << failTestNum << " Amps\n";
 
 						if (failTestNum <= 0.00000019f) {
 							get_out = true;
 							std::cout << "Read2 threshold passed with help3\n";
 						}
+						/*
 						else {	//help4
 							std::cout << "Read2 threshold failed\n";
 							status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
@@ -1337,7 +1416,7 @@ void small_device_pulsed_mode_proper_forming() {
 
 							//read3
 
-							status = viRead(instr, buffer, bytesToRead, &retCount);
+							status = viRead(instr, buffer, 26, &retCount);
 							Sbuffer = reinterpret_cast<char const*>(buffer);
 							position = Sbuffer.find(",");
 							while (position != std::string::npos) {
@@ -1354,7 +1433,7 @@ void small_device_pulsed_mode_proper_forming() {
 							std::this_thread::sleep_for(std::chrono::seconds(1));
 							std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-							status = viRead(instr, buffer, bytesToRead, &retCount);
+							status = viRead(instr, buffer, 26, &retCount);
 							Sbuffer = reinterpret_cast<char const*>(buffer);
 							position = Sbuffer.find(",");
 							while (position != std::string::npos) {
@@ -1380,12 +1459,15 @@ void small_device_pulsed_mode_proper_forming() {
 								std::cout << "Read2 threshold passed with help3\n";
 							}
 						}
+						*/
 					}
+					
 				}
+				
 			}
 			get_out = false;
 		}
-		else */{
+		else {
 			std::cout << "Read2 threshold passed\n";
 		}
 		readsFileName << "\t" << temp3 << std::endl;
@@ -1493,9 +1575,6 @@ int main()
 		}
 		else if (userMessage == "test") {
 			IV_meas();
-		}
-		else if (userMessage == "sweep") {
-			sweepmeas();
 		}
 		else if (userMessage == "disco") {
 			disco();
