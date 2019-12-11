@@ -46,6 +46,14 @@ void disconnectDevice() {
 	std::cout << "Disconnected instrument: " << Devicename << std::endl;
 }
 
+void printProgress(float percentage) {
+	std::string str = "............................................................";
+	int value = (int)(percentage * 100);
+	int progressLength = (int)(percentage * str.length());
+	std::cout << "\r" << std::setw(3) << value << "% [" << std::setw(60) << std::left << str.substr(0, progressLength) << "]";
+	std::cout.flush();
+}
+
 void displayStatus() {
 	std::cout << "Status: " << status << std::endl;
 	std::cout << "Binary Status "<< std::bitset<8>(status) << std::endl;
@@ -176,6 +184,27 @@ void read3FromDevice() {
 	outputFileName << Sbuffer;
 }
 
+void readSmartFromDevice(int data) {
+	int time = (int)std::ceil(data * 0.4f * 2) + 3;
+	for (int i = 0; i <= time; i++) {
+		printProgress((float)i/(float)time);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+	std::cout << std::endl;
+	status = viRead(instr, buffer, 13*data, &retCount);
+	std::cout << "Read: " << retCount / 13 << " data points;\t" << retCount << " bytes" << std::endl;
+	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	//Format data into column
+	int position = Sbuffer.find(",");
+	while (position != std::string::npos) {
+		Sbuffer.replace(position, 1, "\n");
+		position = Sbuffer.find(",", position + 1);
+	}
+	outputFileName << Sbuffer;
+}
+
+
 void readMessageFromDevice() {
 	status = viRead(instr, buffer, 100, &retCount);
 	std::cout << "Message: " << buffer << std::endl;
@@ -205,9 +234,9 @@ void IV_meas() {
 	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
 	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
-	status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 
 	if (make_prep) {
+		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
@@ -237,6 +266,61 @@ void IV_meas() {
 		std::this_thread::sleep_for(std::chrono::seconds(45));
 		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 		read2FromDevice();
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
+void IV_meas2() {
+	std::cout << "Compliance? XE-Y\n";
+	char currentCompliance[10];
+	std::cin >> currentCompliance;
+	char str1[20] = "L";
+	char str2[4] = ",0X";
+	strcat_s(str1, currentCompliance);
+	strcat_s(str1, str2);
+	std::cout << str1 << std::endl;
+	std::cout << "Amount of runs?\n";
+	int amountOfRuns;
+	std::cin >> amountOfRuns;
+	bool make_prep = false;
+	std::cout << "Do prep? 1/0\n";
+	std::cin >> make_prep;
+	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
+	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+
+	if (make_prep) {
+		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		std::this_thread::sleep_for(std::chrono::seconds(40));
+	}
+
+	for (int i = 0; i < amountOfRuns; ++i) {
+		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
+		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+	//	std::this_thread::sleep_for(std::chrono::seconds(29));
+		readSmartFromDevice(-3 * -10 + 1 + 4);	// (-3 * -20 + 1)
+		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,400X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+	//	std::this_thread::sleep_for(std::chrono::seconds(36));
+		readSmartFromDevice(4 * 10 + 4);	// (4 * 20)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -399,14 +483,6 @@ void disco() {
 	std::this_thread::sleep_for(std::chrono::milliseconds(800));
 	status = viWrite(instr, (ViBuf)"D0X", (ViUInt32)strlen("D0X"), &writeCount);
 	std::this_thread::sleep_for(std::chrono::seconds(5));
-}
-
-void printProgress(float percentage) {
-	std::string str = "............................................................";
-	int value = (int)(percentage * 100);
-	int progressLength = (int)(percentage * str.length());
-	std::cout << "\r" << std::setw(3) << value <<"% [" << std::setw(60) << std::left << str.substr(0,progressLength) << "]";
-	std::cout.flush();
 }
 
 void small_device_pulsed_mode() {
@@ -1575,6 +1651,9 @@ int main()
 		}
 		else if (userMessage == "test") {
 			IV_meas();
+		}
+		else if (userMessage == "test2") {
+			IV_meas2();
 		}
 		else if (userMessage == "disco") {
 			disco();
