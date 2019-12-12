@@ -191,7 +191,7 @@ void readSmartFromDevice(int data) {
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
 	std::cout << std::endl;
-	status = viRead(instr, buffer, 13*data, &retCount);
+	status = viRead(instr, buffer, 10000, &retCount);
 	std::cout << "Read: " << retCount / 13 << " data points;\t" << retCount << " bytes" << std::endl;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
 	Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -201,6 +201,8 @@ void readSmartFromDevice(int data) {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
+
+	Sbuffer.assign(Sbuffer, 0, data * 13);
 	outputFileName << Sbuffer;
 }
 
