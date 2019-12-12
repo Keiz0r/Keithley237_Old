@@ -184,13 +184,15 @@ void read3FromDevice() {
 	outputFileName << Sbuffer;
 }
 
-void readSmartFromDevice(int data) {
-	int time = (int)std::ceil(data * 0.4f * 2) + 3;
-	for (int i = 0; i <= time; i++) {
-		printProgress((float)i/(float)time);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+void readSmartFromDevice(int data, bool wait) {
+	if (wait) {
+		int time = (int)std::ceil(data * 0.4f * 2) + 3;
+		for (int i = 0; i <= time; i++) {
+			printProgress((float)i / (float)time);
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+		}
+		std::cout << std::endl;
 	}
-	std::cout << std::endl;
 	status = viRead(instr, buffer, 10000, &retCount);
 	std::cout << "Read: " << retCount / 13 << " data points;\t" << retCount << " bytes" << std::endl;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
@@ -316,13 +318,13 @@ void IV_meas2() {
 		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 	//	std::this_thread::sleep_for(std::chrono::seconds(29));
-		readSmartFromDevice(-3 * -10 + 1 + 4);	// (-3 * -20 + 1)
+		readSmartFromDevice(-3 * -10 + 1 + 4, true);	// (-3 * -20 + 1)
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 	//	std::this_thread::sleep_for(std::chrono::seconds(36));
-		readSmartFromDevice(4 * 10 + 4);	// (4 * 20)
+		readSmartFromDevice(4 * 10 + 4, true);	// (4 * 20)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
