@@ -184,9 +184,9 @@ void read3FromDevice() {
 	outputFileName << Sbuffer;
 }
 
-void readSmartFromDevice(int data, bool wait) {
+void readSmartFromDevice(int data, bool wait, float wait_multiplier) {
 	if (wait) {
-		int time = (int)std::ceil(data * 0.4f * 2) + 3;
+		int time = (int)std::ceil(data * wait_multiplier);
 		for (int i = 0; i <= time; i++) {
 			printProgress((float)i / (float)time);
 			std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -318,13 +318,55 @@ void IV_meas2() {
 		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 	//	std::this_thread::sleep_for(std::chrono::seconds(29));
-		readSmartFromDevice(-3 * -10 + 1 + 4, true);	// (-3 * -20 + 1)
+		readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f);	// (-3 * -20 + 1)
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,400X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 	//	std::this_thread::sleep_for(std::chrono::seconds(36));
-		readSmartFromDevice(4 * 10 + 4, true);	// (4 * 20)
+		readSmartFromDevice(4 * 10 + 4, true, 0.6f);	// (4 * 20)
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
+void IV_meas3() {
+	std::cout << "Compliance? XE-Y\n";
+	char currentCompliance[10];
+	std::cin >> currentCompliance;
+	char str1[20] = "L";
+	char str2[4] = ",0X";
+	strcat_s(str1, currentCompliance);
+	strcat_s(str1, str2);
+	std::cout << str1 << std::endl;
+	std::cout << "Amount of runs?\n";
+	int amountOfRuns;
+	std::cin >> amountOfRuns;
+	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
+	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+
+	for (int i = 0; i < amountOfRuns; ++i) {
+		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
+		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
+		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,100X", (ViUInt32)strlen("Q1,0,-3,0.1,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,100X", (ViUInt32)strlen("Q7,0,-2.9,1,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		//	std::this_thread::sleep_for(std::chrono::seconds(29));
+		readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.15f);	// (-3 * -20 + 1)
+		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,100X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,100X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+		//	std::this_thread::sleep_for(std::chrono::seconds(36));
+		readSmartFromDevice(4 * 10 + 4, true, 0.12f);	// (4 * 20)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -1658,6 +1700,9 @@ int main()
 		}
 		else if (userMessage == "test2") {
 			IV_meas2();
+		}
+		else if (userMessage == "testfast") {
+			IV_meas3();
 		}
 		else if (userMessage == "disco") {
 			disco();
