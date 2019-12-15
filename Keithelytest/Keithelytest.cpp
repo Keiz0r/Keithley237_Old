@@ -329,15 +329,135 @@ void IV_meas2() {
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
+//TODO it
+void setupSmart() {
+	std::cout << "Compliance? XE-Y\n";
+	char currentCompliance[10];
+	std::cin >> currentCompliance;
+	char str1[30] = "L";
+	strcat_s(str1, currentCompliance);
+	strcat_s(str1, ",0X");
+	std::cout << str1 << std::endl;
+
+	std::cout << "Negative up to? (default -3) \n";
+	char negative_limit[5];
+	std::cin >> negative_limit;
+	double Fnegative_limit = strtof(negative_limit, nullptr);
+	strcat_s(negative_limit, ",");
+	char str2[30] = "Q1,0,";
+	strcat_s(str2, negative_limit);
+
+	std::cout << "Voltage step? (default 0.1) \n";
+	char voltage_step[20];
+	std::cin >> voltage_step;
+	strcat_s(str2, voltage_step);
+	strcat_s(str2, ",0,");
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
+
+	std::cout << "TimeStep? (default 400) \n";
+	char timeStep[10];
+	std::cin >> timeStep;
+	strcat_s(str2, timeStep);
+	strcat_s(str2, "X");
+	std::cout << str2 << std::endl;
+
+	std::cout << "Positive up to? (default 4) \n";
+	char positive_limit[5];
+	std::cin >> positive_limit;
+	double Fpositive_limit = strtof(positive_limit, nullptr);
+	strcat_s(positive_limit, ",");
+	char str4[30] = "Q1,";
+	strcat_s(str4, voltage_step);
+	strcat_s(str4, ",");
+	strcat_s(str4, positive_limit);
+	strcat_s(str4, voltage_step);
+	strcat_s(str4, ",0,");
+	strcat_s(str4, timeStep);
+	strcat_s(str4, "X");
+	std::cout << str4 << std::endl;
+
+	char str3[30] = "Q7,";
+	char tt[10];
+	sprintf_s(tt, "%0.1f", Fnegative_limit + Fvoltage_Step);
+	strcat_s(str3, tt);
+	strcat_s(str3, ",0,1,0,");
+	strcat_s(str3, timeStep);
+	strcat_s(str3, "X");
+	std::cout << str3 << std::endl;
+
+	char str5[30] = "Q7,";
+	sprintf_s(tt, "%0.1f", Fpositive_limit - Fvoltage_Step);
+	strcat_s(str5, tt);
+	strcat_s(str5, ",0.3,1.5,0,");
+	strcat_s(str5, timeStep);
+	strcat_s(str5, "X");
+	std::cout << str5 << std::endl;
+}
+
 void IV_meas3() {
 	std::cout << "Compliance? XE-Y\n";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
-	char str1[20] = "L";
-	char str2[4] = ",0X";
+	char str1[30] = "L";
 	strcat_s(str1, currentCompliance);
-	strcat_s(str1, str2);
+	strcat_s(str1, ",0X");
 	std::cout << str1 << std::endl;
+
+	std::cout << "Negative up to? (default -3) \n";
+	char negative_limit[5];
+	std::cin >> negative_limit;
+	double Fnegative_limit = strtof(negative_limit, nullptr);
+	strcat_s(negative_limit, ",");
+	char str2[30] = "Q1,0,";
+	strcat_s(str2, negative_limit);
+
+	std::cout << "Voltage step? (default 0.1) \n";
+	char voltage_step[20];
+	std::cin >> voltage_step;
+	strcat_s(str2, voltage_step);
+	strcat_s(str2, ",0,");
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
+
+	std::cout << "TimeStep? (default 400) \n";
+	char timeStep[10];
+	std::cin >> timeStep;
+	double FtimeStep = strtof(timeStep, nullptr);
+	strcat_s(str2, timeStep);
+	strcat_s(str2, "X");
+	std::cout << str2 << std::endl;
+
+	std::cout << "Positive up to? (default 4) \n";
+	char positive_limit[5];
+	std::cin >> positive_limit;
+	double Fpositive_limit = strtof(positive_limit, nullptr);
+	strcat_s(positive_limit, ",");
+	char str4[30] = "Q1,";
+	strcat_s(str4, voltage_step);
+	strcat_s(str4, ",");
+	strcat_s(str4, positive_limit);
+	strcat_s(str4, voltage_step);
+	strcat_s(str4, ",0,");
+	strcat_s(str4, timeStep);
+	strcat_s(str4, "X");
+	std::cout << str4 << std::endl;
+
+	char str3[30] = "Q7,";
+	char tt[10];
+	sprintf_s(tt, "%0.1f", Fnegative_limit + Fvoltage_Step);
+	strcat_s(str3, tt);
+	strcat_s(str3, ",0,1,0,");
+	strcat_s(str3, timeStep);
+	strcat_s(str3, "X");
+	std::cout << str3 << std::endl;
+
+	char str5[30] = "Q7,";
+	sprintf_s(tt, "%0.1f", Fpositive_limit - Fvoltage_Step);
+	strcat_s(str5, tt);
+	strcat_s(str5, ",0.3,1.5,0,");
+	strcat_s(str5, timeStep);
+	strcat_s(str5, "X");
+	std::cout << str5 << std::endl;
+
 	std::cout << "Amount of runs?\n";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
@@ -356,17 +476,17 @@ void IV_meas3() {
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
 		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
-		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,100X", (ViUInt32)strlen("Q1,0,-3,0.1,0,100X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,100X", (ViUInt32)strlen("Q7,0,-2.9,1,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)str2, (ViUInt32)strlen(str2), &writeCount);
+		status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		//	std::this_thread::sleep_for(std::chrono::seconds(29));
-		readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.15f);	// (-3 * -20 + 1)
+		readSmartFromDevice(std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep);	// (-3 * -20 + 1)
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,100X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,100X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,100X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,100X"), &writeCount);
+		status = viWrite(instr, (ViBuf)str4, (ViUInt32)strlen(str4), &writeCount);
+		status = viWrite(instr, (ViBuf)str5, (ViUInt32)strlen(str5), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		//	std::this_thread::sleep_for(std::chrono::seconds(36));
-		readSmartFromDevice(4 * 10 + 4, true, 0.12f);	// (4 * 20)
+		readSmartFromDevice(std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep);	// (4 * 20)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -412,7 +532,6 @@ void Itmeas() {
 	}
 	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 }
-
 
 void forming() {
 	std::cout << "Forming mode\n";
@@ -1675,7 +1794,7 @@ int main()
 	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
 	status = viOpenDefaultRM(&defaultRM);
 	connectDevice();
-
+	
 	while (userMessage != "exit") {
 		std::cin >> userMessage;
 
