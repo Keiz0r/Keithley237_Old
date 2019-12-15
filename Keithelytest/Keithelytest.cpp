@@ -206,6 +206,7 @@ void readSmartFromDevice(int data, bool wait, float wait_multiplier) {
 
 	Sbuffer.assign(Sbuffer, 0, data * 13);
 	outputFileName << Sbuffer;
+	std::cout << buffer << "\n\n" << Sbuffer << std::endl;
 }
 
 
@@ -406,7 +407,7 @@ void IV_meas3() {
 	std::cout << "Negative up to? (default -3) \n";
 	char negative_limit[5];
 	std::cin >> negative_limit;
-	double Fnegative_limit = strtof(negative_limit, nullptr);
+	float Fnegative_limit = strtof(negative_limit, nullptr);
 	strcat_s(negative_limit, ",");
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
@@ -416,12 +417,12 @@ void IV_meas3() {
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
-	double Fvoltage_Step = strtof(voltage_step, nullptr);
+	float Fvoltage_Step = strtof(voltage_step, nullptr);
 
 	std::cout << "TimeStep? (default 400) \n";
 	char timeStep[10];
 	std::cin >> timeStep;
-	double FtimeStep = strtof(timeStep, nullptr);
+	float FtimeStep = strtof(timeStep, nullptr);
 	strcat_s(str2, timeStep);
 	strcat_s(str2, "X");
 	std::cout << str2 << std::endl;
@@ -429,7 +430,7 @@ void IV_meas3() {
 	std::cout << "Positive up to? (default 4) \n";
 	char positive_limit[5];
 	std::cin >> positive_limit;
-	double Fpositive_limit = strtof(positive_limit, nullptr);
+	float Fpositive_limit = strtof(positive_limit, nullptr);
 	strcat_s(positive_limit, ",");
 	char str4[30] = "Q1,";
 	strcat_s(str4, voltage_step);
@@ -1794,7 +1795,7 @@ int main()
 	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
 	status = viOpenDefaultRM(&defaultRM);
 	connectDevice();
-	
+
 	while (userMessage != "exit") {
 		std::cin >> userMessage;
 
@@ -1820,7 +1821,7 @@ int main()
 		else if (userMessage == "test2") {
 			IV_meas2();
 		}
-		else if (userMessage == "testfast") {
+		else if (userMessage == "testsmart") {
 			IV_meas3();
 		}
 		else if (userMessage == "disco") {
