@@ -8,13 +8,24 @@
 #include <chrono>
 #include "Instrument.h"
 
-#define OPERATE_OFF status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-#define OPERATE_ON  status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-#define DC_MODE     status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
-#define SWEEP_MODE  status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
-#define TRIGGER     status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 
-
+#define MODE_DC		                   writeToDevice("F0,0X");
+#define MODE_SWEEP	                   writeToDevice("F0,1X");
+#define TRIGGER_ACTION		           writeToDevice("H0X");
+#define OPERATE_OFF                    writeToDevice("N0X");
+#define OPERATE_ON	                   writeToDevice("N1X");
+#define FILTER_DISABLE		           writeToDevice("P0X");
+#define FILTER_2READINGS	           writeToDevice("P1X");
+#define FILTER_4READINGS	           writeToDevice("P2X");
+#define FILTER_8READINGS	           writeToDevice("P3X");
+#define FILTER_16READINGS	           writeToDevice("P4X");
+#define FILTER_32READINGS	           writeToDevice("P5X");
+#define TRIGGER_ENABLE                 writeToDevice("R1X");
+#define TRIGGER_DISABLE                writeToDevice("R0X");
+#define INTEGRATION_TIME_FAST          writeToDevice("S0X");	//  416 uSec |4-digit Resolution
+#define INTEGRATION_TIME_MEDIUM        writeToDevice("S1X");	//    4 mSec |5-digit Resolution
+#define INTEGRATION_TIME_LINECYCLE60HZ writeToDevice("S2X");	//16.67 mSec |5-digit Resolution
+#define INTEGRATION_TIME_LINECYCLE50HZ writeToDevice("S3X");	//   20 mSec |5-digit Resolution
 std::string userMessage;
 
 static ViSession defaultRM, instr;
@@ -42,9 +53,18 @@ void deviceSettings() {
 }
 
 void connectDevice() {
+	status = viOpenDefaultRM(&defaultRM);
+	if (status < VI_SUCCESS) {
+		std::cout << "ERROR Initializing VISA driver" << std::endl;
+	}
 	status = viOpen(defaultRM, Devicename, VI_NULL, VI_NULL, &instr);
 	std::cout << "Connecting to instrument: " << Devicename << std::endl;
-	deviceSettings();	// Apply preset
+	if (status <= 0) {
+		std::cout << "ERROR: Instrument not found" << std::endl;
+	}
+	else {
+		deviceSettings();	// Apply preset
+	}
 }
 
 void disconnectDevice() {
@@ -59,6 +79,14 @@ void printProgress(float percentage) {
 	int progressLength = (int)(percentage * str.length());
 	std::cout << "\r" << std::setw(3) << value << "% [" << std::setw(60) << std::left << str.substr(0, progressLength) << "]";
 	std::cout.flush();
+}
+
+void waitAndPrintProgress(int time) {
+	for (int i = 0; i <= time; i++) {
+		printProgress((float)i / (float)time);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+	std::cout << std::endl;
 }
 
 void displayStatus() {
@@ -97,6 +125,19 @@ void writeToDevice(const char *msg) {
 	//Tested G4,2,2X
 
 	//U List of errors																	page 3-62
+}
+
+void set_dc_bias(float bias,int range) {
+	char Cmsg[15] = "B";
+	char Cvalue[15];
+	char Crange[2];
+	sprintf_s(Cvalue, "%0.3f", bias);
+	sprintf_s(Crange, "%i", range);
+	strcat_s(Cmsg, Cvalue);
+	strcat_s(Cmsg, ",");
+	strcat_s(Cmsg, Crange);
+	strcat_s(Cmsg, ",0X");
+	writeToDevice(Cmsg);
 }
 
 bool waitForSweepEnd() {
@@ -194,11 +235,7 @@ void read3FromDevice() {
 bool readSmartFromDevice(int data, bool wait, float wait_multiplier, bool do_analysis_of_RonRoff) {
 	if (wait) {
 		int time = (int)std::ceil(data * wait_multiplier);
-		for (int i = 0; i <= time; i++) {
-			printProgress((float)i / (float)time);
-			std::this_thread::sleep_for(std::chrono::seconds(1));
-		}
-		std::cout << std::endl;
+		waitAndPrintProgress(time);
 	}
 	status = viRead(instr, buffer, 10000, &retCount);
 	std::cout << "Read: " << retCount / 13 << " data points;\t" << retCount << " bytes" << std::endl;
@@ -477,15 +514,15 @@ void IV_measSmart() {
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	INTEGRATION_TIME_FAST
+	FILTER_DISABLE
 	OPERATE_OFF
-	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	TRIGGER_DISABLE
 	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
-	SWEEP_MODE
+	MODE_SWEEP
 //	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
 	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
-	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	TRIGGER_ENABLE
 	OPERATE_ON
 	
 	std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
@@ -494,12 +531,12 @@ void IV_measSmart() {
 		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)str2, (ViUInt32)strlen(str2), &writeCount);
 		status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);
-		TRIGGER
+		TRIGGER_ACTION
 		readSmartFromDevice(std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep, false);	// (-3 * -20 + 1)
 		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 		status = viWrite(instr, (ViBuf)str4, (ViUInt32)strlen(str4), &writeCount);
 		status = viWrite(instr, (ViBuf)str5, (ViUInt32)strlen(str5), &writeCount);
-		TRIGGER
+		TRIGGER_ACTION
 		if (!readSmartFromDevice(std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep, true)) {
 
 			outputFailuresFileName << i << std::endl;
@@ -508,13 +545,13 @@ void IV_measSmart() {
 			status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
 			status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
 			status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
-			TRIGGER
+			TRIGGER_ACTION
 		//	readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
 			std::this_thread::sleep_for(std::chrono::seconds(70));
 			status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
 			status = viWrite(instr, (ViBuf)"Q1,0.1,8,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,8,0.1,0,400X"), &writeCount);
 			status = viWrite(instr, (ViBuf)"Q7,7.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,7.9,0.3,1.5,0,400X"), &writeCount);
-			TRIGGER
+			TRIGGER_ACTION
 		//	readSmartFromDevice(4 * 10 + 4, true, 0.6f, false);	// (4 * 20)
 			std::this_thread::sleep_for(std::chrono::seconds(70));
 
@@ -1760,32 +1797,21 @@ void small_device_pulsed_mode_proper_forming() {
 void pulses_failure_assistSmart() {
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 	OPERATE_OFF
-	DC_MODE
-	TRIGGER
+	MODE_DC
+	TRIGGER_ACTION
 //	status = viWrite(instr, (ViBuf)"G15,0,0X", (ViUInt32)strlen("G15,0,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"B4,0,0X", (ViUInt32)strlen("B4,0,0X"), &writeCount);
+	set_dc_bias(4.0f,0);
 	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
 	OPERATE_ON
-	std::cout << "30 seconds forming ongoing" << std::endl;
-	for (int i = 0; i <= 30; i++) {
-		printProgress((float)i / (float)30);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
-	std::cout << std::endl;
-	status = viWrite(instr, (ViBuf)"B0.3,0,0X", (ViUInt32)strlen("B0.3,0,0X"), &writeCount);
+	std::cout << "40 seconds forming ongoing" << std::endl;
+	waitAndPrintProgress(40);
+	set_dc_bias(0.3f, 0);
 	std::cout << "10 seconds resting" << std::endl;
-	for (int i = 0; i <= 10; i++) {
-		printProgress((float)i / (float)10);
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-	}
+	waitAndPrintProgress(10);
 	OPERATE_OFF
 	std::cout << "\nforming finished" << std::endl;
 	std::this_thread::sleep_for(std::chrono::seconds(1));
-	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
-	SWEEP_MODE
-	OPERATE_ON
+	set_dc_bias(0.0f, 0);
 }
 
 void test0_pulsed_modeSmart() {
@@ -1802,22 +1828,22 @@ void test0_pulsed_modeSmart() {
 	std::string::size_type sz;
 	bool get_out = false;
 	int position;
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
+	INTEGRATION_TIME_FAST
+	FILTER_DISABLE
 	OPERATE_OFF
-	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
+	TRIGGER_DISABLE
+	set_dc_bias(0.0f,0);
 	//	status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings; not necessary here, but the instrument doesn't argue.
-	SWEEP_MODE
+	MODE_SWEEP
 	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);
 	//	status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);	//create sweep
 	OPERATE_ON
-	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+	TRIGGER_ENABLE
 	for (int i = 0; i < amountOfRuns; ++i) {
 		status = viWrite(instr, (ViBuf)"L0.4E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
 	//	status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-5,2,1,100,100X"), &writeCount);
-		TRIGGER
+		TRIGGER_ACTION
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -1837,7 +1863,7 @@ void test0_pulsed_modeSmart() {
 		//read part 2
 		status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-		TRIGGER
+		TRIGGER_ACTION
 		std::this_thread::sleep_for(std::chrono::seconds(1));
 		std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -1864,11 +1890,13 @@ void test0_pulsed_modeSmart() {
 			while (!get_out) {
 				std::cout << "Read1 threshold failed\n";
 				pulses_failure_assistSmart();
+				MODE_SWEEP
+				OPERATE_ON
 				assist_forming_counter_file << i + 1 << " ";
 				status = viWrite(instr, (ViBuf)"L0.4E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings
 	//		status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
 				status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
-				TRIGGER
+				TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(1));
 			//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -1888,7 +1916,7 @@ void test0_pulsed_modeSmart() {
 				//read part 2
 				status = viWrite(instr, (ViBuf)"L1E-3,7X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
 				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-				TRIGGER
+				TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(1));
 				std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -1929,7 +1957,7 @@ void test0_pulsed_modeSmart() {
 
 		status = viWrite(instr, (ViBuf)"L1E-1,9X", (ViUInt32)strlen("L1E-1,9X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,3.5,2,1,100,1000X", (ViUInt32)strlen("Q3,3.5,2,1,400,1000X"), &writeCount);	//TODO modify reset voltage to possibly +4
-		TRIGGER
+		TRIGGER_ACTION
 		std::this_thread::sleep_for(std::chrono::seconds(2));
 		//std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
@@ -1953,7 +1981,7 @@ void test0_pulsed_modeSmart() {
 		//read part 2
 		status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
-		TRIGGER
+		TRIGGER_ACTION
 		std::this_thread::sleep_for(std::chrono::seconds(3));
 		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -1981,8 +2009,8 @@ void test0_pulsed_modeSmart() {
 				std::cout << "Read2 threshold failed\n";
 				status = viWrite(instr, (ViBuf)"L1E-1,9X", (ViUInt32)strlen("L1E-3,7X"), &writeCount);	//CC Settings
 				status = viWrite(instr, (ViBuf)"Q3,4,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
-				TRIGGER
-				std::cout << "- - - - - - - Applied 1mA CC RESET- - - - - -\n\n";
+				TRIGGER_ACTION
+				std::cout << "- - - - - - - Applied +4V RESET- - - - - -\n\n";
 				std::this_thread::sleep_for(std::chrono::seconds(3));
 				//	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 					//read part 1
@@ -2003,7 +2031,7 @@ void test0_pulsed_modeSmart() {
 				//read part 2
 				status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
 				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
-				TRIGGER
+				TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(3));
 				//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -2025,7 +2053,7 @@ void test0_pulsed_modeSmart() {
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read2 current after 1mA RESET: " << failTestNum << " Amps\n";
+				std::cout << "Read2 current after +4V RESET: " << failTestNum << " Amps\n";
 
 				if (failTestNum <= 0.00000019f) {
 					get_out = true;
@@ -2035,8 +2063,8 @@ void test0_pulsed_modeSmart() {
 					std::cout << "Read2 threshold failed\n";
 					status = viWrite(instr, (ViBuf)"L1E-1,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
 					status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
-					TRIGGER
-					std::cout << "- - - - - - - Applied 100mA RESET- - - - - -\n\n";
+					TRIGGER_ACTION
+					std::cout << "- - - - - - - Applied +5V RESET- - - - - -\n\n";
 					std::this_thread::sleep_for(std::chrono::seconds(3));
 					//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
@@ -2060,7 +2088,7 @@ void test0_pulsed_modeSmart() {
 					//read part 2
 					status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
 					status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-					TRIGGER
+					TRIGGER_ACTION
 					std::this_thread::sleep_for(std::chrono::seconds(3));
 					//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
@@ -2082,7 +2110,7 @@ void test0_pulsed_modeSmart() {
 					temp2.assign(Sbuffer, 10, 2);
 					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 					failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-					std::cout << "Read2 current after 10mA RESET: " << failTestNum << " Amps\n";
+					std::cout << "Read2 current after +5V RESET: " << failTestNum << " Amps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
@@ -2428,8 +2456,10 @@ void smallDeviceForming(){
 
 int main()
 {
-	std::cout << "\n                              Keithley 237 automation protocol\n                                      Pavel Baikov 2019\n\n";
-	status = viOpenDefaultRM(&defaultRM);
+	std::cout << "\n\
+                              Keithley 237 automation protocol\n\
+                                      Pavel Baikov 2019\n\
+                                      Version 26.12.2019\n\n";
 	connectDevice();
 
 	while (userMessage != "exit") {
