@@ -150,7 +150,7 @@ void setCurrentCompliance(const char* value, int range) {
 	strcat_s(Cmsg, value);
 	strcat_s(Cmsg, ",");
 	strcat_s(Cmsg, Crange);
-	strcat_s(Cmsg, ",X");
+	strcat_s(Cmsg, "X");
 	writeToDevice(Cmsg);
 }
 
@@ -269,8 +269,8 @@ bool readSmartFromDevice(int data, bool wait, float wait_multiplier, bool do_ana
 		std::string::size_type sz;
 		float Ron = std::stof(Sbuffer.substr(2 * 13, 12), &sz);
 		float Roff = std::stof(Sbuffer.substr(43 * 13, 12), &sz);
-		std::cout << "\nON current = " << Ron * pow(10, 6) << " uA" << std::endl;
-		std::cout << "OFF current= " << Roff * pow(10,6) << " uA" << std::endl;
+		std::cout << "\nON current = " << Ron *  pow(10, 6) << " uA" << std::endl;
+		std::cout << "OFF current= "   << Roff * pow(10, 6) << " uA" << std::endl;
 		std::cout << "Ron/Roff ratio= " << Ron / Roff << std::endl;
 		if ((Ron / Roff) < 3.0f) {
 			std::cout << "!!! Alert, failure encountered !!!  Ron/Roff < 3" << std::endl;
@@ -639,7 +639,7 @@ void IV_meas_thermal_Smart() {
 	std::cout << "Amount of runs?\n";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
-	INTEGRATION_TIME_FAST
+	INTEGRATION_TIME_LINECYCLE60HZ
 		FILTER_DISABLE
 		OPERATE_OFF
 		TRIGGER_DISABLE
@@ -1934,15 +1934,14 @@ void test0_pulsed_modeSmart() {
 	std::string::size_type sz;
 	bool get_out = false;
 	int position;
+	setCurrentCompliance("4E-4", 7);	//IMPORTANT if not here,the instrument starts saying PULSE TIME NOT MET
+	set_dc_bias(0.0f, 0);
 	INTEGRATION_TIME_FAST
 	FILTER_DISABLE
 	OPERATE_OFF
 	TRIGGER_DISABLE
-	set_dc_bias(0.0f,0);
-	//	status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings; not necessary here, but the instrument doesn't argue.
 	MODE_SWEEP
 	DATA_FORMAT_OUTPUT_SWEEP
-	//	status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);	//create sweep
 	OPERATE_ON
 	TRIGGER_ENABLE
 	for (int i = 0; i < amountOfRuns; ++i) {
@@ -1990,7 +1989,7 @@ void test0_pulsed_modeSmart() {
 		temp2.assign(Sbuffer, 10, 2);
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read1 current: " << failTestNum << " Amps\n";
+		std::cout << "Read1 current: " << failTestNum * pow( 10, 6 ) << " uAmps\n";
 
 		if (failTestNum <= 0.00000079f) {	//Less than 0.4uA
 			while (!get_out) {
@@ -2043,7 +2042,7 @@ void test0_pulsed_modeSmart() {
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read1 current: " << failTestNum << " Amps\n";
+				std::cout << "Read1 current: " << failTestNum * pow(10, 6) << " uAmps\n";
 
 				if (failTestNum >= 0.00000099f) {
 					get_out = true;
@@ -2108,8 +2107,8 @@ void test0_pulsed_modeSmart() {
 		temp2.assign(Sbuffer, 10, 2);
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read2 current: " << failTestNum << " Amps\n";
-		
+		std::cout << "Read2 current: " << failTestNum * pow(10, 9) << " nAmps\n";
+
 		if (failTestNum >= 0.000000199f) {	//More than 0.2uA
 			while (!get_out) {
 				std::cout << "Read2 threshold failed\n";
@@ -2159,7 +2158,7 @@ void test0_pulsed_modeSmart() {
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read2 current after +4V RESET: " << failTestNum << " Amps\n";
+				std::cout << "Read2 current after +4V RESET: " << failTestNum * pow(10, 9) << " nAmps\n";
 
 				if (failTestNum <= 0.00000019f) {
 					get_out = true;
@@ -2216,7 +2215,7 @@ void test0_pulsed_modeSmart() {
 					temp2.assign(Sbuffer, 10, 2);
 					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 					failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-					std::cout << "Read2 current after +5V RESET: " << failTestNum << " Amps\n";
+					std::cout << "Read2 current after +5V RESET: " << failTestNum * pow(10, 9) << " nAmps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
@@ -2565,7 +2564,7 @@ int main()
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
                                       Pavel Baikov 2019\n\
-                                      Version 4.1.2020\n\n";
+                                      Version 5.1.2020\n\n";
 	connectDevice();
 
 	while (1) {
@@ -2627,8 +2626,7 @@ int main()
 			IV_meas_thermal_Smart();
 		}
 		else if (userMessage == "exit") {
-			status = viClose(instr);
-			status = viClose(defaultRM);
+			disconnectDevice();
 			break;
 		}
 		else {
