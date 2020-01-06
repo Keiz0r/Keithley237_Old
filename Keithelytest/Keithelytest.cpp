@@ -469,9 +469,6 @@ void IV_measSmart() {
 	std::cout << "Compliance? XE-Y\n";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
-	char str1[30] = "L";
-	strcat_s(str1, currentCompliance);
-	strcat_s(str1, ",0X");
 
 	std::cout << "Negative up to? (default -3) \n";
 	char negative_limit[5];
@@ -541,7 +538,7 @@ void IV_measSmart() {
 	std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		writeToDevice(str1);
+		setCurrentCompliance(currentCompliance, 0);
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
@@ -555,7 +552,7 @@ void IV_measSmart() {
 			outputFailuresFileName << i << std::endl;
 			std::this_thread::sleep_for(std::chrono::seconds(10));
 			std::cout << " - - - - - - Dear lord please save us - - - - - - " << std::endl;
-			writeToDevice(str1);
+			setCurrentCompliance(currentCompliance, 0);
 			status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
 			status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
 			TRIGGER_ACTION
@@ -574,12 +571,12 @@ void IV_measSmart() {
 }
 
 void IV_meas_thermal_Smart() {
+	/*
 	std::cout << "Compliance? XE-Y\n";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
-	char str1[30] = "L";
-	strcat_s(str1, currentCompliance);
-	strcat_s(str1, ",0X");
+	*/
+	setCurrentCompliance("1E-7", 3);
 
 	std::cout << "Negative up to? (default -0.3) \n";
 	char negative_limit[10];
@@ -589,7 +586,7 @@ void IV_meas_thermal_Smart() {
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
 
-	std::cout << "Voltage step? (default 0.1) \n";
+	std::cout << "Voltage step? (default 0.01) \n";
 	char voltage_step[20];
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
@@ -640,28 +637,27 @@ void IV_meas_thermal_Smart() {
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	INTEGRATION_TIME_LINECYCLE60HZ
-		FILTER_DISABLE
-		OPERATE_OFF
-		TRIGGER_DISABLE
-		set_dc_bias(0.0f, 0);
+	FILTER_8READINGS
+	OPERATE_OFF
+	TRIGGER_DISABLE
+	set_dc_bias(0.0f, 0);
 	MODE_SWEEP
-		//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-		DATA_FORMAT_OUTPUT_SWEEP
-		TRIGGER_ENABLE
-		OPERATE_ON
+	//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+	DATA_FORMAT_OUTPUT_SWEEP
+	TRIGGER_ENABLE
+	OPERATE_ON
 
-		std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
+	std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		writeToDevice(str1);
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
-		readSmartFromDevice((Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.003f * FtimeStep, false);	// (-3 * -20 + 1)
+		readSmartFromDevice((Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.0017f * FtimeStep, false);	// (-3 * -20 + 1)
 		writeToDevice(str4);
 		writeToDevice(str5);
 		TRIGGER_ACTION
-		readSmartFromDevice((Fpositive_limit / Fvoltage_Step) * 2, true, 0.003f * FtimeStep, false);
+		readSmartFromDevice((Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -2085,7 +2081,7 @@ void test0_pulsed_modeSmart() {
 
 		//read part 2
 		setCurrentCompliance("1E-6", 4);
-		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
+		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
 		TRIGGER_ACTION
 		std::this_thread::sleep_for(std::chrono::seconds(3));
 		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -2135,7 +2131,7 @@ void test0_pulsed_modeSmart() {
 
 				//read part 2
 				setCurrentCompliance("1E-6", 4);
-				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
 				TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(3));
 				//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
@@ -2563,8 +2559,8 @@ int main()
 {
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
-                                      Pavel Baikov 2019\n\
-                                      Version 5.1.2020\n\n";
+                                      Pavel Baikov\n\
+                                      Version 6.1.2020\n\n";
 	connectDevice();
 
 	while (1) {
