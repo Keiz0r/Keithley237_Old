@@ -471,7 +471,7 @@ void IV_measSmart() {
 	std::cin >> currentCompliance;
 
 	std::cout << "Negative up to? (default -3) \n";
-	char negative_limit[5];
+	char negative_limit[10];
 	std::cin >> negative_limit;
 	float Fnegative_limit = strtof(negative_limit, nullptr);
 	strcat_s(negative_limit, ",");
@@ -493,7 +493,7 @@ void IV_measSmart() {
 	strcat_s(str2, "X");
 
 	std::cout << "Positive up to? (default 4) \n";
-	char positive_limit[5];
+	char positive_limit[10];
 	std::cin >> positive_limit;
 	float Fpositive_limit = strtof(positive_limit, nullptr);
 	strcat_s(positive_limit, ",");
@@ -576,7 +576,17 @@ void IV_meas_thermal_Smart() {
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
 	*/
-	setCurrentCompliance("1E-7", 3);
+
+
+	std::cout << "Device state? (on/off)\n";
+	char devicestate[10];
+	std::cin >> devicestate;
+	if (devicestate == "on") {
+		setCurrentCompliance("2E-4", 7);
+	}
+	else {
+		setCurrentCompliance("8E-6", 5);
+	}
 
 	std::cout << "Negative up to? (default -0.3) \n";
 	char negative_limit[10];
@@ -593,7 +603,7 @@ void IV_meas_thermal_Smart() {
 	strcat_s(str2, ",0,");
 	float Fvoltage_Step = strtof(voltage_step, nullptr);
 
-	std::cout << "TimeStep? (default 400) \n";
+	std::cout << "TimeStep? (default 1000) \n";
 	char timeStep[10];
 	std::cin >> timeStep;
 	float FtimeStep = strtof(timeStep, nullptr);
@@ -897,7 +907,7 @@ void small_device_pulsed_mode() {
 		temp1.assign(Sbuffer, 27, 7);
 		temp2.assign(Sbuffer, 36, 2);
 	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 	//	std::cout << "Read1 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 		if (failTestNum <= 0.00000099f) {	//Less than 1uA
 			while (!get_out) {
@@ -2560,9 +2570,9 @@ int main()
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
                                       Pavel Baikov\n\
-                                      Version 6.1.2020\n\n";
+                                      Version 9.1.2020\n\n";
 	connectDevice();
-
+	
 	while (1) {
 		std::cin >> userMessage;
 
