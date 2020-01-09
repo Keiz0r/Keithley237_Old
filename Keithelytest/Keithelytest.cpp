@@ -473,7 +473,7 @@ void IV_measSmart() {
 	std::cout << "Negative up to? (default -3) \n";
 	char negative_limit[10];
 	std::cin >> negative_limit;
-	float Fnegative_limit = strtof(negative_limit, nullptr);
+	double Fnegative_limit = strtof(negative_limit, nullptr);
 	strcat_s(negative_limit, ",");
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
@@ -483,7 +483,7 @@ void IV_measSmart() {
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
-	float Fvoltage_Step = strtof(voltage_step, nullptr);
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
 	std::cout << "TimeStep? (default 400) \n";
 	char timeStep[10];
@@ -495,7 +495,7 @@ void IV_measSmart() {
 	std::cout << "Positive up to? (default 4) \n";
 	char positive_limit[10];
 	std::cin >> positive_limit;
-	float Fpositive_limit = strtof(positive_limit, nullptr);
+	double Fpositive_limit = strtof(positive_limit, nullptr);
 	strcat_s(positive_limit, ",");
 	char str4[30] = "Q1,";
 	strcat_s(str4, voltage_step);
@@ -542,12 +542,12 @@ void IV_measSmart() {
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
-		readSmartFromDevice(std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep, false);	// (-3 * -20 + 1)
+		readSmartFromDevice((int)std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep, false);	// (-3 * -20 + 1)
 		setCurrentCompliance("1E-1", 0);
 		writeToDevice(str4);
 		writeToDevice(str5);
 		TRIGGER_ACTION
-		if (!readSmartFromDevice(std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep, true)) {
+		if (!readSmartFromDevice((int)std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep, true)) {
 
 			outputFailuresFileName << i << std::endl;
 			std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -591,7 +591,7 @@ void IV_meas_thermal_Smart() {
 	std::cout << "Negative up to? (default -0.3) \n";
 	char negative_limit[10];
 	std::cin >> negative_limit;
-	float Fnegative_limit = strtof(negative_limit, nullptr);
+	double Fnegative_limit = strtof(negative_limit, nullptr);
 	strcat_s(negative_limit, ",");
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
@@ -601,7 +601,7 @@ void IV_meas_thermal_Smart() {
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
-	float Fvoltage_Step = strtof(voltage_step, nullptr);
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
 	std::cout << "TimeStep? (default 1000) \n";
 	char timeStep[10];
@@ -613,7 +613,7 @@ void IV_meas_thermal_Smart() {
 	std::cout << "Positive up to? (default 0.3) \n";
 	char positive_limit[10];
 	std::cin >> positive_limit;
-	float Fpositive_limit = strtof(positive_limit, nullptr);
+	double Fpositive_limit = strtof(positive_limit, nullptr);
 	strcat_s(positive_limit, ",");
 	char str4[30] = "Q1,";
 	strcat_s(str4, voltage_step);
@@ -663,11 +663,11 @@ void IV_meas_thermal_Smart() {
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
-		readSmartFromDevice((Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.0017f * FtimeStep, false);	// (-3 * -20 + 1)
+		readSmartFromDevice((int)(Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.0017f * FtimeStep, false);	// (-3 * -20 + 1)
 		writeToDevice(str4);
 		writeToDevice(str5);
 		TRIGGER_ACTION
-		readSmartFromDevice((Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
+		readSmartFromDevice((int)(Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -947,7 +947,7 @@ void small_device_pulsed_mode() {
 
 				temp1.assign(Sbuffer, 53, 7);
 				temp2.assign(Sbuffer, 62, 2);
-				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 			//	std::cout << "Read1 current after +5V help: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 				if (failTestNum >= 0.00000099f) {
 					get_out = true;
@@ -983,7 +983,7 @@ void small_device_pulsed_mode() {
 						temp1.assign(Sbuffer, 1, 7);
 						temp2.assign(Sbuffer, 10, 2);
 						//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-						failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+						failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 						//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 						if (failTestNum <= 0.00000019f) {
@@ -1011,7 +1011,7 @@ void small_device_pulsed_mode() {
 
 								temp1.assign(Sbuffer, 53, 7);
 								temp2.assign(Sbuffer, 62, 2);
-								failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+								failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 								//	std::cout << "Read1 current after +5V help: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 								if (failTestNum >= 0.00000099f) {
 									get_out = true;
@@ -1074,7 +1074,7 @@ void small_device_pulsed_mode() {
 		temp1.assign(Sbuffer, 27, 7);
 		temp2.assign(Sbuffer, 36, 2);
 	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 	//	std::cout << "Read2 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 		if (failTestNum >= 0.00000019f) {	//More than 0.5uA
 			while (!get_out) {
@@ -1117,7 +1117,7 @@ void small_device_pulsed_mode() {
 				temp1.assign(Sbuffer, 27, 7);
 				temp2.assign(Sbuffer, 36, 2);
 			//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 			//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 				if (failTestNum <= 0.00000019f) {
@@ -1174,7 +1174,7 @@ void small_device_pulsed_mode() {
 					temp1.assign(Sbuffer, 1, 7);
 					temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-					failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+					failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 				//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 					if (failTestNum <= 0.00000019f) {
@@ -1228,7 +1228,7 @@ void small_device_pulsed_mode() {
 						temp2.assign(Sbuffer, 10, 2);
 
 						//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-						failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+						failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 					//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 						if (failTestNum <= 0.00000019f) {
@@ -1281,7 +1281,7 @@ void small_device_pulsed_mode() {
 							temp2.assign(Sbuffer, 10, 2);
 
 							//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-							failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+							failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 							//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 							if (failTestNum <= 0.00000019f) {
@@ -1389,7 +1389,7 @@ void small_device_pulsed_mode_proper_forming() {
 		temp1.assign(Sbuffer, 1, 7);
 		temp2.assign(Sbuffer, 10, 2);
 	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 		std::cout << "Read1 current: " << failTestNum << " Amps\n";
 		
 		/*							//TODO implement failproof
@@ -1658,7 +1658,7 @@ void small_device_pulsed_mode_proper_forming() {
 		temp1.assign(Sbuffer, 1, 7);
 		temp2.assign(Sbuffer, 10, 2);
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 		std::cout << "Read2 current: " << failTestNum << " Amps\n";
 		/*
 		if (failTestNum >= 0.000000199f) {	//More than 0.2uA
@@ -1994,8 +1994,8 @@ void test0_pulsed_modeSmart() {
 		temp1.assign(Sbuffer, 1, 7);
 		temp2.assign(Sbuffer, 10, 2);
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read1 current: " << failTestNum * pow( 10, 6 ) << " uAmps\n";
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+		std::cout << "Read1 current: " << failTestNum * (float)pow( 10, 6 ) << " uAmps\n";
 
 		if (failTestNum <= 0.00000079f) {	//Less than 0.4uA
 			while (!get_out) {
@@ -2047,8 +2047,8 @@ void test0_pulsed_modeSmart() {
 				temp1.assign(Sbuffer, 1, 7);
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read1 current: " << failTestNum * pow(10, 6) << " uAmps\n";
+				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+				std::cout << "Read1 current: " << failTestNum * (float)pow(10, 6) << " uAmps\n";
 
 				if (failTestNum >= 0.00000099f) {
 					get_out = true;
@@ -2112,8 +2112,8 @@ void test0_pulsed_modeSmart() {
 		temp1.assign(Sbuffer, 1, 7);
 		temp2.assign(Sbuffer, 10, 2);
 		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read2 current: " << failTestNum * pow(10, 9) << " nAmps\n";
+		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+		std::cout << "Read2 current: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
 		if (failTestNum >= 0.000000199f) {	//More than 0.2uA
 			while (!get_out) {
@@ -2163,8 +2163,8 @@ void test0_pulsed_modeSmart() {
 				temp1.assign(Sbuffer, 1, 7);
 				temp2.assign(Sbuffer, 10, 2);
 				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-				failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read2 current after +4V RESET: " << failTestNum * pow(10, 9) << " nAmps\n";
+				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+				std::cout << "Read2 current after +4V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
 				if (failTestNum <= 0.00000019f) {
 					get_out = true;
@@ -2220,8 +2220,8 @@ void test0_pulsed_modeSmart() {
 					temp1.assign(Sbuffer, 1, 7);
 					temp2.assign(Sbuffer, 10, 2);
 					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-					failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-					std::cout << "Read2 current after +5V RESET: " << failTestNum * pow(10, 9) << " nAmps\n";
+					failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+					std::cout << "Read2 current after +5V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
@@ -2374,7 +2374,7 @@ void test0neg() {
 	std::cout << "Negative up to? (default -3) \n";
 	char negative_limit[8];
 	std::cin >> negative_limit;
-	float Fnegative_limit = strtof(negative_limit, nullptr);
+	double Fnegative_limit = strtof(negative_limit, nullptr);
 	strcat_s(negative_limit, ",");
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
@@ -2384,7 +2384,7 @@ void test0neg() {
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
-	float Fvoltage_Step = strtof(voltage_step, nullptr);
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
 	std::cout << "TimeStep? (default 400) \n";
 	char timeStep[10];
@@ -2424,7 +2424,7 @@ void test0neg() {
 		status = viWrite(instr, (ViBuf)str2, (ViUInt32)strlen(str2), &writeCount);
 		status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		readSmartFromDevice(std::ceil(Fnegative_limit / Fvoltage_Step) * -2 + 1 + 0, true, 0.005f * FtimeStep, false);	// (-3 * -20 + 1)
+		readSmartFromDevice((int)std::ceil(Fnegative_limit / Fvoltage_Step) * -2 + 1 + 0, true, 0.005f * FtimeStep, false);	// (-3 * -20 + 1)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -2441,7 +2441,7 @@ void test0pos() {
 	std::cout << "Voltage step? (default 0.1) \n";
 	char voltage_step[20];
 	std::cin >> voltage_step;
-	float Fvoltage_Step = strtof(voltage_step, nullptr);
+	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
 	std::cout << "TimeStep? (default 400) \n";
 	char timeStep[10];
@@ -2451,7 +2451,7 @@ void test0pos() {
 	std::cout << "Positive up to? (default 4) \n";
 	char positive_limit[5];
 	std::cin >> positive_limit;
-	float Fpositive_limit = strtof(positive_limit, nullptr);
+	double Fpositive_limit = strtof(positive_limit, nullptr);
 	strcat_s(positive_limit, ",");
 	char str4[30] = "Q1,0,";
 	strcat_s(str4, positive_limit);
@@ -2490,7 +2490,7 @@ void test0pos() {
 		status = viWrite(instr, (ViBuf)str4, (ViUInt32)strlen(str4), &writeCount);
 		status = viWrite(instr, (ViBuf)str5, (ViUInt32)strlen(str5), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		readSmartFromDevice(std::ceil(Fpositive_limit / Fvoltage_Step) * 2 + 1, true, 0.003f * FtimeStep, false);
+		readSmartFromDevice((int)std::ceil(Fpositive_limit / Fvoltage_Step) * 2 + 1, true, 0.003f * FtimeStep, false);
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
