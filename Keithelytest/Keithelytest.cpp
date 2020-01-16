@@ -578,10 +578,10 @@ void IV_meas_thermal_Smart() {
 	*/
 
 
-	std::cout << "Device state? (on/off)\n";
-	char devicestate[10];
+	std::cout << "Device state? (1/0 for on/off)\n";
+	bool devicestate;
 	std::cin >> devicestate;
-	if (devicestate == "on") {
+	if (devicestate == true) {
 		setCurrentCompliance("2E-4", 7);
 	}
 	else {
@@ -675,7 +675,7 @@ void IV_meas_thermal_Smart() {
 void Itmeas() {
 	std::cout << "I(t) measurement mode\n";
 	std::cout << "Voltage?\n";
-	char ItVoltage[5];
+	char ItVoltage[10];
 	std::cin >> ItVoltage;
 	char str1[20] = "B";
 	char str2[6] = ",0,0X";
@@ -688,19 +688,35 @@ void Itmeas() {
 	char str4[4] = ",0X";
 	strcat_s(str3, currentCompliance);
 	strcat_s(str3, str4);
+	std::cout << "tick time? (measurement per x seconds)\n";
+	int ticktime;
+	std::cin >> ticktime;
+
+	std::cout << "Apply filter? (1/0)\n";
+	bool filterstate;
+	std::cin >> filterstate;
+	if (filterstate == true) {
+		INTEGRATION_TIME_LINECYCLE60HZ
+		FILTER_32READINGS
+		std::cout << "filtering is active" << std::endl;
+	}
+	else {
+		FILTER_DISABLE
+		INTEGRATION_TIME_FAST
+	}
+	std::cin >> filterstate;
 	std::ofstream outputFileName("KeithIt.txt", std::ios::app);
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
+	OPERATE_OFF
+	TRIGGER_DISABLE
 	status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"G15,0,0X", (ViUInt32)strlen("G15,0,0X"), &writeCount);
+	DATA_FORMAT_OUTPUT_TICK
 	status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);
 	status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);	//CC Settings
-	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+	TRIGGER_ENABLE
+	OPERATE_ON
+	TRIGGER_ACTION
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	std::cout << "I(t) experiment is going on" << std::endl;
 	while (1) {
 		status = viRead(instr, buffer, 100, &retCount);
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
@@ -710,8 +726,9 @@ void Itmeas() {
 		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
 		Sbuffer.erase(0,36);//remove 1st letters
 		outputFileName << measTime << "\t"<< Sbuffer << std::endl;
+		std::this_thread::sleep_for(std::chrono::seconds(ticktime));
 	}
-	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
+	OPERATE_OFF
 }
 
 void forming() {
@@ -1941,6 +1958,12 @@ void test0_pulsed_modeSmart() {
 	bool get_out = false;
 	int position;
 	setCurrentCompliance("4E-4", 7);	//IMPORTANT if not here,the instrument starts saying PULSE TIME NOT MET
+	char cc_cur[10];
+	std::cout << "Compliance value? (default 4E-4)" << std::endl;
+	std::cin >> cc_cur;
+	bool failcheckenable;
+	std::cout << "Enable failcheck? (1/0)" << std::endl;
+	std::cin >> failcheckenable;
 	set_dc_bias(0.0f, 0);
 	INTEGRATION_TIME_FAST
 	FILTER_DISABLE
@@ -1951,7 +1974,7 @@ void test0_pulsed_modeSmart() {
 	OPERATE_ON
 	TRIGGER_ENABLE
 	for (int i = 0; i < amountOfRuns; ++i) {
-		setCurrentCompliance("4E-4", 7);
+		setCurrentCompliance(cc_cur, 7);
 	//	status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
 		TRIGGER_ACTION
@@ -1997,14 +2020,14 @@ void test0_pulsed_modeSmart() {
 		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 		std::cout << "Read1 current: " << failTestNum * (float)pow( 10, 6 ) << " uAmps\n";
 
-		if (failTestNum <= 0.00000079f) {	//Less than 0.4uA
+		if (failTestNum <= 0.00000079f && failcheckenable) {	//Less than 0.4uA
 			while (!get_out) {
 				std::cout << "Read1 threshold failed\n";
 				pulses_failure_assistSmart();
 				MODE_SWEEP
 				OPERATE_ON
 				assist_forming_counter_file << i + 1 << " ";
-				setCurrentCompliance("4E-4", 7);
+				setCurrentCompliance(cc_cur, 7);
 	//		status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
 				status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
 				TRIGGER_ACTION
@@ -2570,7 +2593,7 @@ int main()
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
                                       Pavel Baikov\n\
-                                      Version 9.1.2020\n\n";
+                                      Version 10.1.2020\n\n";
 	connectDevice();
 	
 	while (1) {
