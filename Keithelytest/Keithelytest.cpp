@@ -1,13 +1,13 @@
 #include <iostream>
-#include "visa.h"
+#include "C:\Program Files (x86)\IVI Foundation\VISA\WinNT\Include\visa.h"
 #include <bitset>
 #include <string>
 #include <fstream>
 #include <iomanip>
 #include <thread>
 #include <chrono>
-#include "Instrument.h"
-
+//#include "Instrument.h"
+#pragma comment( lib,"visa32" )
 
 #define MODE_DC		                   writeToDevice("F0,0X");
 #define MODE_SWEEP	                   writeToDevice("F0,1X");
