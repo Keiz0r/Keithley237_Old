@@ -2595,7 +2595,7 @@ int main()
                                       Pavel Baikov\n\
                                       Version 10.1.2020\n\n";
 	connectDevice();
-	
+
 	while (1) {
 		std::cin >> userMessage;
 
