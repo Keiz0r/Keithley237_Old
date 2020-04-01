@@ -1,3 +1,5 @@
+//NOTE: that is a "STATE MACHINE", so the change of states doesn't have to happen in exactly same order
+#define	_CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include "C:\Program Files (x86)\IVI Foundation\VISA\WinNT\Include\visa.h"
 #include <bitset>
@@ -6,6 +8,7 @@
 #include <iomanip>
 #include <thread>
 #include <chrono>
+#include <time.h>
 //#include "Instrument.h"
 #pragma comment( lib,"visa32" )
 
@@ -40,6 +43,19 @@ int bytesToRead;
 static std::string Sbuffer;
 static const char* Devicename = "GPIB0::2::INSTR";
 
+
+void currentTime() {
+
+	time_t rawtime;
+	struct tm* timeinfo;
+
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	printf("Current local time and date: %s", asctime(timeinfo));
+
+	std::this_thread::sleep_for(std::chrono::seconds(1));
+
+}
 
 void deviceSettings() {
 	status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 3000);	// Timeout value 3000 milliseconds (3sec)
@@ -283,66 +299,6 @@ bool readSmartFromDevice(int data, bool wait, float wait_multiplier, bool do_ana
 void readMessageFromDevice() {
 	status = viRead(instr, buffer, 100, &retCount);
 	std::cout << "Message: " << buffer << std::endl;
-}
-
-void IV_meas() {
-	std::cout << "Compliance? XE-Y\n";
-	char currentCompliance[10];
-	std::cin >> currentCompliance;
-	char str1[20] = "L";
-	char str2[4] = ",0X";
-	strcat_s(str1, currentCompliance);
-	strcat_s(str1, str2);
-	std::cout << str1 << std::endl;
-	std::cout << "Amount of runs?\n";
-	int amountOfRuns;
-	std::cin >> amountOfRuns;
-	bool make_prep = false;
-	std::cout << "Do prep? 1/0\n";
-	std::cin >> make_prep;
-	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
-
-	if (make_prep) {
-		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(40));
-	}
-
-	for (int i = 0; i < amountOfRuns; ++i) {
-		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
-		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(50));
-		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
-		read1FromDevice();
-		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,2.9,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(45));
-		status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-		read2FromDevice();
-	}
-	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
 void IV_meas2() {
@@ -704,7 +660,6 @@ void Itmeas() {
 		FILTER_DISABLE
 		INTEGRATION_TIME_FAST
 	}
-	std::cin >> filterstate;
 	std::ofstream outputFileName("KeithIt.txt", std::ios::app);
 	OPERATE_OFF
 	TRIGGER_DISABLE
@@ -716,6 +671,7 @@ void Itmeas() {
 	OPERATE_ON
 	TRIGGER_ACTION
 	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+	currentTime();
 	std::cout << "I(t) experiment is going on" << std::endl;
 	while (1) {
 		status = viRead(instr, buffer, 100, &retCount);
@@ -1972,6 +1928,7 @@ void test0_pulsed_modeSmart() {
 	MODE_SWEEP
 	DATA_FORMAT_OUTPUT_SWEEP
 	OPERATE_ON
+	currentTime();
 	TRIGGER_ENABLE
 	for (int i = 0; i < amountOfRuns; ++i) {
 		setCurrentCompliance(cc_cur, 7);
@@ -2592,8 +2549,8 @@ int main()
 {
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
-                                      Pavel Baikov\n\
-                                      Version 10.1.2020\n\n";
+                                Build: " << __DATE__ << " " << __TIME__ << "\n\
+                                      Pavel Baikov\n" << std::endl;
 	connectDevice();
 
 	while (1) {
@@ -2614,9 +2571,6 @@ int main()
 		}
 		else if (userMessage == "readm") {
 			readMessageFromDevice();
-		}
-		else if (userMessage == "test") {
-			IV_meas();
 		}
 		else if (userMessage == "test2") {
 			IV_meas2();
