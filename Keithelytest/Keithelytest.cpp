@@ -31,6 +31,7 @@
 #define INTEGRATION_TIME_MEDIUM        writeToDevice("S1X");	//    4 mSec |5-digit Resolution
 #define INTEGRATION_TIME_LINECYCLE60HZ writeToDevice("S2X");	//16.67 mSec |5-digit Resolution
 #define INTEGRATION_TIME_LINECYCLE50HZ writeToDevice("S3X");	//   20 mSec |5-digit Resolution
+#define BUFFER_CLEAR				   memset(buffer, 0, sizeof buffer);
 std::string userMessage;
 
 static ViSession defaultRM, instr;
@@ -43,6 +44,11 @@ int bytesToRead;
 static std::string Sbuffer;
 static const char* Devicename = "GPIB0::2::INSTR";
 
+void displayHelp() {
+	std::cout << "\nList of available functions:\n\nhelp - display help message\ntest2 - IV sweep (designed for big devices)\n\
+testspecial - IV + stepped IV (designed for big devices)\ntestsmart\ntest0neg\ntest0pos\ntest0pulse\nit - I(t) measurement\n\
+forming\nsdforming\nsdp\nsdppf\nivheat - IV sweep for oven (designed for small devices)\nexit - exit program\n" << std::endl;
+}
 
 void currentTime() {
 
@@ -70,18 +76,20 @@ void deviceSettings() {
 	*/
 }
 
-void connectDevice() {
+bool connectDevice() {
 	status = viOpenDefaultRM(&defaultRM);
 	if (status < VI_SUCCESS) {
-		std::cout << "ERROR Initializing VISA driver" << std::endl;
+		std::cout << "\nERROR Initializing VISA driver" << std::endl;
 	}
 	status = viOpen(defaultRM, Devicename, VI_NULL, VI_NULL, &instr);
 	std::cout << "Connecting to instrument: " << Devicename << std::endl;
 	if (status < 0) {
-		std::cout << "ERROR: Instrument not found" << std::endl;
+		std::cerr << "\n\n\n\n          >>>ERROR: Instrument not found<<<\n\n\n\n\n          Check connection and restart the proram" << std::endl;
+		return false;
 	}
 	else {
 		deviceSettings();	// Apply preset
+		return true;
 	}
 }
 
@@ -109,10 +117,10 @@ void waitAndPrintProgress(int time) {
 
 void displayStatus() {
 	std::cout << "Status: " << status << std::endl;
-	std::cout << "Binary Status "<< std::bitset<8>(status) << std::endl;
+	std::cout << "Binary Status " << std::bitset<8>(status) << std::endl;
 }
 
-void writeToDevice(const char *msg) {
+void writeToDevice(const char* msg) {
 	status = viWrite(instr, (ViBuf)msg, (ViUInt32)strlen(msg), &writeCount);
 
 	//"X" stands for Execute command all the time
@@ -128,7 +136,7 @@ void writeToDevice(const char *msg) {
 	//H0X - to activate trigger			(can't set bias until trigger is active)		page 3-35
 
 	//BV,R,D - Voltage,Range, Delay. TO SET THE BIAS									page 3-19
-	
+
 	//N1X - Turn ON/OFF (0)
 
 	//L1E-3,R - Current COMPLIANCE setting, R- range (1-1nA,2-10nA,4-1uA,7-1mA,9-100mA) page 3-38
@@ -145,7 +153,7 @@ void writeToDevice(const char *msg) {
 	//U List of errors																	page 3-62
 }
 
-void set_dc_bias(float bias,int range) {
+void set_dc_bias(float bias, int range) {
 	char Cmsg[15] = "B";
 	char Cvalue[15];
 	char Crange[4];
@@ -177,7 +185,7 @@ bool waitForSweepEnd() {
 	Sbuffer = reinterpret_cast<char const*>(buffer);
 	Sbuffer.assign(Sbuffer, 16, 1);
 	std::cout << "that number is : " << Sbuffer << std::endl;
-	if (Sbuffer == "2"){
+	if (Sbuffer == "2") {
 		std::cout << "FINALLY" << std::endl;
 		return false;
 	}
@@ -208,7 +216,7 @@ void read1FromDevice() {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
-	Sbuffer.assign(Sbuffer, 0, 61*13);
+	Sbuffer.assign(Sbuffer, 0, 61 * 13);
 	outputFileName << Sbuffer;
 }
 
@@ -258,7 +266,7 @@ void read3FromDevice() {
 		Sbuffer.replace(position, 1, "\n");
 		position = Sbuffer.find(",", position + 1);
 	}
-	Sbuffer.erase(Sbuffer.size() - 4*13);
+	Sbuffer.erase(Sbuffer.size() - 4 * 13);
 	outputFileName << Sbuffer;
 }
 
@@ -285,8 +293,8 @@ bool readSmartFromDevice(int data, bool wait, float wait_multiplier, bool do_ana
 		std::string::size_type sz;
 		float Ron = std::stof(Sbuffer.substr(2 * 13, 12), &sz);
 		float Roff = std::stof(Sbuffer.substr(43 * 13, 12), &sz);
-		std::cout << "\nON current = " << Ron *  pow(10, 6) << " uA" << std::endl;
-		std::cout << "OFF current= "   << Roff * pow(10, 6) << " uA" << std::endl;
+		std::cout << "\nON current = " << Ron * pow(10, 6) << " uA" << std::endl;
+		std::cout << "OFF current= " << Roff * pow(10, 6) << " uA" << std::endl;
 		std::cout << "Ron/Roff ratio= " << Ron / Roff << std::endl;
 		if ((Ron / Roff) < 3.0f) {
 			std::cout << "!!! Alert, failure encountered !!!  Ron/Roff < 3" << std::endl;
@@ -302,7 +310,7 @@ void readMessageFromDevice() {
 }
 
 void IV_meas2() {
-	std::cout << "Compliance? XE-Y\n";
+	std::cout << "Compliance? XE-Y\n>> ";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
 	char str1[20] = "L";
@@ -310,52 +318,167 @@ void IV_meas2() {
 	strcat_s(str1, currentCompliance);
 	strcat_s(str1, str2);
 	std::cout << str1 << std::endl;
-	std::cout << "Amount of runs?\n";
+	std::cout << "Amount of runs?\n>> ";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	bool make_prep = false;
 	std::cout << "Do prep? 1/0\n";
 	std::cin >> make_prep;
-	status = viWrite(instr, (ViBuf)"L4E-4,0X", (ViUInt32)strlen("L4E-4,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"S0X", (ViUInt32)strlen("S0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"P0X", (ViUInt32)strlen("P0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);	//Data Format IS IMPORTANT!!!
-	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+	setCurrentCompliance("4E-4", 0);
+	INTEGRATION_TIME_FAST
+		FILTER_DISABLE
+		OPERATE_OFF
+		TRIGGER_DISABLE
+		writeToDevice("B0,0,0X");
+	MODE_SWEEP
+		writeToDevice("M2,X");	//Mask to get end of sweep
+	DATA_FORMAT_OUTPUT_SWEEP
+		TRIGGER_ENABLE
+		OPERATE_ON
 
-	if (make_prep) {
-		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-		std::this_thread::sleep_for(std::chrono::seconds(40));
-	}
+		if (make_prep) {
+			status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
+			OPERATE_ON
+				TRIGGER_ENABLE
+				TRIGGER_ACTION
+				std::this_thread::sleep_for(std::chrono::seconds(40));
+		}
 
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
-		status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);	//CC Settings
-		status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-	//	std::this_thread::sleep_for(std::chrono::seconds(29));
-		readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
-		status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,3,0.1,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q7,3.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,3.9,0.3,1.5,0,400X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-	//	std::this_thread::sleep_for(std::chrono::seconds(36));
-		readSmartFromDevice(4 * 10 + 4, true, 0.6f, false);	// (4 * 20)
+		writeToDevice(str1);
+		writeToDevice("Q1,0,-3,0.1,0,400X");
+		writeToDevice("Q7,-2.9,0,1,0,400X");
+		TRIGGER_ACTION
+			//	std::this_thread::sleep_for(std::chrono::seconds(29));
+			readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
+		setCurrentCompliance("1E-1", 0);
+		writeToDevice("Q1,0.1,4,0.1,0,400X");
+		writeToDevice("Q7,3.9,0.3,1.5,0,400X");
+		TRIGGER_ACTION
+			//	std::this_thread::sleep_for(std::chrono::seconds(36));
+			readSmartFromDevice(4 * 10 + 4, true, 0.6f, false);	// (4 * 20)
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
+void IV_plus_steppedIV() {
+	std::cout << "Compliance? XE-Y\n>> ";
+	char currentCompliance[10];
+	std::cin >> currentCompliance;
+	char str1[20] = "L";
+	char str2[4] = ",0X";
+	strcat_s(str1, currentCompliance);
+	strcat_s(str1, str2);
+	std::cout << "Amount of runs?\n>> ";
+	int amountOfRuns;
+	std::cin >> amountOfRuns;
+	bool make_prep = false;
+	std::cout << "Do prep? 1/0\n>> ";
+	std::cin >> make_prep;
+	double tickVoltage = 0.0;
+	char temp[10];
+	char str3[20] = "B";
+	char str4[6] = ",0,0X";
+	char str5[20];
+	float currentTestNum;
+	float tempTestNum;
+	static std::string temp1;
+	static std::string temp2;
+	std::string::size_type sz;
+	std::ofstream outputFileName("It_data_part.txt", std::ios::app);
+	setCurrentCompliance("4E-4", 0);
+	INTEGRATION_TIME_FAST
+		FILTER_DISABLE
+		OPERATE_OFF
+		TRIGGER_DISABLE
+		writeToDevice("B0,0,0X");
+	MODE_SWEEP
+		writeToDevice("M2,X");	//Mask to get end of sweep
+	DATA_FORMAT_OUTPUT_SWEEP
+		TRIGGER_ENABLE
+
+		auto tickRead = [&]() {	//lambda func
+		BUFFER_CLEAR
+			status = viRead(instr, buffer, 100, &retCount);
+		Sbuffer = reinterpret_cast<char const*>(buffer);
+		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << std::fixed << std::setprecision(2) << tickVoltage << "\t" << Sbuffer << std::endl;
+	};
+
+	OPERATE_ON
+
+		if (make_prep) {
+			status = viWrite(instr, (ViBuf)"L1E-1,0X", (ViUInt32)strlen("L1E-1,0X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"Q1,0.1,4,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,4,0.1,0,400X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"Q7,3.9,0,0.1,0,400X", (ViUInt32)strlen("Q7,0,3.9,0.1,0,400X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+			std::this_thread::sleep_for(std::chrono::seconds(40));
+		}
+
+	for (int i = 0; i < amountOfRuns; ++i) {
+		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
+		//step 1
+		writeToDevice(str1);
+		writeToDevice("Q1,0,-3,0.1,0,400X");
+		writeToDevice("Q7,-2.9,0,1,0,400X");
+		TRIGGER_ACTION
+			readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
+
+			//step 2
+		OPERATE_OFF
+			MODE_DC
+			TRIGGER_ACTION
+			setCurrentCompliance("1E-1", 0);
+		DATA_FORMAT_OUTPUT_TICK
+			tickVoltage = 0.1;
+		tempTestNum = 0.0f;
+		OPERATE_ON
+			while (1) {
+				sprintf_s(temp, "%0.1f", tickVoltage);
+				str5[0] = 0;
+				strcat_s(str5, str3);
+				strcat_s(str5, temp);
+				strcat_s(str5, str4);
+				writeToDevice(str5);
+				tickRead();
+				temp1.assign(Sbuffer, 0, 7);
+				temp2.assign(Sbuffer, 9, 2);
+				currentTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+				std::cout << "temp1: " << temp1 << " temp2: " << temp2 << " testnum: " << currentTestNum << std::endl;
+				if ((currentTestNum < tempTestNum - 0.0f) && tickVoltage > 0.2) {
+					break;
+				}
+				else if (tickVoltage >= 4.0) {
+					std::cout << "Reset didn't happen! --- problem here" << std::endl;
+				}
+				std::this_thread::sleep_for(std::chrono::seconds(1));	//step width
+				tickVoltage += 0.1;
+				tempTestNum = currentTestNum;
+			}
+		std::this_thread::sleep_for(std::chrono::seconds(1));	//rest time
+		//test read
+		tickVoltage = 0.1;
+		while (tickVoltage < 0.4) {
+			sprintf_s(temp, "%0.1f", tickVoltage);
+			str5[0] = 0;
+			strcat_s(str5, str3);
+			strcat_s(str5, temp);
+			strcat_s(str5, str4);
+			writeToDevice(str5);
+			tickRead();
+			std::this_thread::sleep_for(std::chrono::seconds(1));	//step width
+			tickVoltage += 0.1;
+		}
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+	OPERATE_OFF
+}
 //TODO it
 void setupSmart() {
 	std::cout << "Compliance? XE-Y\n";
@@ -422,11 +545,11 @@ void setupSmart() {
 }
 
 void IV_measSmart() {
-	std::cout << "Compliance? XE-Y\n";
+	std::cout << "Compliance? XE-Y\n>> ";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
 
-	std::cout << "Negative up to? (default -3) \n";
+	std::cout << "Negative up to? (default -3) \n>> ";
 	char negative_limit[10];
 	std::cin >> negative_limit;
 	double Fnegative_limit = strtof(negative_limit, nullptr);
@@ -434,21 +557,21 @@ void IV_measSmart() {
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
 
-	std::cout << "Voltage step? (default 0.1) \n";
+	std::cout << "Voltage step? (default 0.1) \n>> ";
 	char voltage_step[20];
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
 	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
-	std::cout << "TimeStep? (default 400) \n";
+	std::cout << "TimeStep? (default 400) \n>> ";
 	char timeStep[10];
 	std::cin >> timeStep;
 	float FtimeStep = strtof(timeStep, nullptr);
 	strcat_s(str2, timeStep);
 	strcat_s(str2, "X");
 
-	std::cout << "Positive up to? (default 4) \n";
+	std::cout << "Positive up to? (default 4) \n>> ";
 	char positive_limit[10];
 	std::cin >> positive_limit;
 	double Fpositive_limit = strtof(positive_limit, nullptr);
@@ -477,51 +600,51 @@ void IV_measSmart() {
 	strcat_s(str5, timeStep);
 	strcat_s(str5, "X");
 
-	std::cout << "Amount of runs?\n";
+	std::cout << "Amount of runs?\n>> ";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	INTEGRATION_TIME_FAST
-	FILTER_DISABLE
-	OPERATE_OFF
-	TRIGGER_DISABLE
-	set_dc_bias(0.0f,0);
+		FILTER_DISABLE
+		OPERATE_OFF
+		TRIGGER_DISABLE
+		set_dc_bias(0.0f, 0);
 	MODE_SWEEP
-//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-	DATA_FORMAT_OUTPUT_SWEEP
-	TRIGGER_ENABLE
-	OPERATE_ON
-	
-	std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
+		//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+		DATA_FORMAT_OUTPUT_SWEEP
+		TRIGGER_ENABLE
+		OPERATE_ON
+
+		std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
 		setCurrentCompliance(currentCompliance, 0);
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
-		readSmartFromDevice((int)std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep, false);	// (-3 * -20 + 1)
+			readSmartFromDevice((int)std::ceil(Fnegative_limit / Fvoltage_Step) * -1 + 1 + 4, true, 0.0015f * FtimeStep, false);	// (-3 * -20 + 1)
 		setCurrentCompliance("1E-1", 0);
 		writeToDevice(str4);
 		writeToDevice(str5);
 		TRIGGER_ACTION
-		if (!readSmartFromDevice((int)std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep, true)) {
+			if (!readSmartFromDevice((int)std::ceil(Fpositive_limit / Fvoltage_Step) + 4, true, 0.0012f * FtimeStep, true)) {
 
-			outputFailuresFileName << i << std::endl;
-			std::this_thread::sleep_for(std::chrono::seconds(10));
-			std::cout << " - - - - - - Dear lord please save us - - - - - - " << std::endl;
-			setCurrentCompliance(currentCompliance, 0);
-			status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
-			status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
-			TRIGGER_ACTION
-		//	readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
-			std::this_thread::sleep_for(std::chrono::seconds(70));
-			setCurrentCompliance("1E-1", 0);
-			status = viWrite(instr, (ViBuf)"Q1,0.1,8,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,8,0.1,0,400X"), &writeCount);
-			status = viWrite(instr, (ViBuf)"Q7,7.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,7.9,0.3,1.5,0,400X"), &writeCount);
-			TRIGGER_ACTION
-		//	readSmartFromDevice(4 * 10 + 4, true, 0.6f, false);	// (4 * 20)
-			std::this_thread::sleep_for(std::chrono::seconds(70));
+				outputFailuresFileName << i << std::endl;
+				std::this_thread::sleep_for(std::chrono::seconds(10));
+				std::cout << " - - - - - - Dear lord please save us - - - - - - " << std::endl;
+				setCurrentCompliance(currentCompliance, 0);
+				status = viWrite(instr, (ViBuf)"Q1,0,-3,0.1,0,400X", (ViUInt32)strlen("Q1,0,-3,0.1,0,400X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"Q7,-2.9,0,1,0,400X", (ViUInt32)strlen("Q7,0,-2.9,1,0,400X"), &writeCount);
+				TRIGGER_ACTION
+					//	readSmartFromDevice(-3 * -10 + 1 + 4, true, 0.6f, false);	// (-3 * -20 + 1)
+					std::this_thread::sleep_for(std::chrono::seconds(70));
+				setCurrentCompliance("1E-1", 0);
+				status = viWrite(instr, (ViBuf)"Q1,0.1,8,0.1,0,400X", (ViUInt32)strlen("Q1,0.1,8,0.1,0,400X"), &writeCount);
+				status = viWrite(instr, (ViBuf)"Q7,7.9,0.3,1.5,0,400X", (ViUInt32)strlen("Q7,7.9,0.3,1.5,0,400X"), &writeCount);
+				TRIGGER_ACTION
+					//	readSmartFromDevice(4 * 10 + 4, true, 0.6f, false);	// (4 * 20)
+					std::this_thread::sleep_for(std::chrono::seconds(70));
 
-		}
+			}
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -534,7 +657,7 @@ void IV_meas_thermal_Smart() {
 	*/
 
 
-	std::cout << "Device state? (1/0 for on/off)\n";
+	std::cout << "Device state? (1/0 for on/off)\n>> ";
 	bool devicestate;
 	std::cin >> devicestate;
 	if (devicestate == true) {
@@ -544,7 +667,7 @@ void IV_meas_thermal_Smart() {
 		setCurrentCompliance("8E-6", 5);
 	}
 
-	std::cout << "Negative up to? (default -0.3) \n";
+	std::cout << "Negative up to? (default -0.3) \n>> ";
 	char negative_limit[10];
 	std::cin >> negative_limit;
 	double Fnegative_limit = strtof(negative_limit, nullptr);
@@ -552,21 +675,21 @@ void IV_meas_thermal_Smart() {
 	char str2[30] = "Q1,0,";
 	strcat_s(str2, negative_limit);
 
-	std::cout << "Voltage step? (default 0.01) \n";
+	std::cout << "Voltage step? (default 0.01) \n>> ";
 	char voltage_step[20];
 	std::cin >> voltage_step;
 	strcat_s(str2, voltage_step);
 	strcat_s(str2, ",0,");
 	double Fvoltage_Step = strtof(voltage_step, nullptr);
 
-	std::cout << "TimeStep? (default 1000) \n";
+	std::cout << "TimeStep? (default 1000) \n>> ";
 	char timeStep[10];
 	std::cin >> timeStep;
 	float FtimeStep = strtof(timeStep, nullptr);
 	strcat_s(str2, timeStep);
 	strcat_s(str2, "X");
 
-	std::cout << "Positive up to? (default 0.3) \n";
+	std::cout << "Positive up to? (default 0.3) \n>> ";
 	char positive_limit[10];
 	std::cin >> positive_limit;
 	double Fpositive_limit = strtof(positive_limit, nullptr);
@@ -603,74 +726,74 @@ void IV_meas_thermal_Smart() {
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	INTEGRATION_TIME_LINECYCLE60HZ
-	FILTER_8READINGS
-	OPERATE_OFF
-	TRIGGER_DISABLE
-	set_dc_bias(0.0f, 0);
+		FILTER_8READINGS
+		OPERATE_OFF
+		TRIGGER_DISABLE
+		set_dc_bias(0.0f, 0);
 	MODE_SWEEP
-	//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
-	DATA_FORMAT_OUTPUT_SWEEP
-	TRIGGER_ENABLE
-	OPERATE_ON
+		//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+		DATA_FORMAT_OUTPUT_SWEEP
+		TRIGGER_ENABLE
+		OPERATE_ON
 
-	std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
+		std::ofstream outputFailuresFileName("KeithOUTFailures.txt", std::ios::app);
 	for (int i = 0; i < amountOfRuns; ++i) {
 		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
 		writeToDevice(str2);
 		writeToDevice(str3);
 		TRIGGER_ACTION
-		readSmartFromDevice((int)(Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.0017f * FtimeStep, false);	// (-3 * -20 + 1)
+			readSmartFromDevice((int)(Fnegative_limit / Fvoltage_Step) * -2 + 1, true, 0.0017f * FtimeStep, false);	// (-3 * -20 + 1)
 		writeToDevice(str4);
 		writeToDevice(str5);
 		TRIGGER_ACTION
-		readSmartFromDevice((int)(Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
+			readSmartFromDevice((int)(Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
 void Itmeas() {
 	std::cout << "I(t) measurement mode\n";
-	std::cout << "Voltage?\n";
+	std::cout << "Voltage?\n>> ";
 	char ItVoltage[10];
 	std::cin >> ItVoltage;
 	char str1[20] = "B";
 	char str2[6] = ",0,0X";
 	strcat_s(str1, ItVoltage);
 	strcat_s(str1, str2);
-	std::cout << "Compliance? XE-Y\n";
+	std::cout << "Compliance? XE-Y\n>> ";
 	char currentCompliance[10];
 	std::cin >> currentCompliance;
 	char str3[20] = "L";
 	char str4[4] = ",0X";
 	strcat_s(str3, currentCompliance);
 	strcat_s(str3, str4);
-	std::cout << "tick time? (measurement per x seconds)\n";
+	std::cout << "tick time? (measurement per x seconds)\n>> ";
 	int ticktime;
 	std::cin >> ticktime;
 
-	std::cout << "Apply filter? (1/0)\n";
+	std::cout << "Apply filter? (1/0)\n>> ";
 	bool filterstate;
 	std::cin >> filterstate;
 	if (filterstate == true) {
 		INTEGRATION_TIME_LINECYCLE60HZ
-		FILTER_32READINGS
-		std::cout << "filtering is active" << std::endl;
+			FILTER_32READINGS
+			std::cout << "filtering is active" << std::endl;
 	}
 	else {
 		FILTER_DISABLE
-		INTEGRATION_TIME_FAST
+			INTEGRATION_TIME_FAST
 	}
 	std::ofstream outputFileName("KeithIt.txt", std::ios::app);
 	OPERATE_OFF
-	TRIGGER_DISABLE
-	status = viWrite(instr, (ViBuf)"F0,0X", (ViUInt32)strlen("F0,0X"), &writeCount);
-	DATA_FORMAT_OUTPUT_TICK
-	status = viWrite(instr, (ViBuf)str1, (ViUInt32)strlen(str1), &writeCount);
+		TRIGGER_DISABLE
+		MODE_DC
+		DATA_FORMAT_OUTPUT_TICK
+		writeToDevice(str1);
 	status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);	//CC Settings
 	TRIGGER_ENABLE
-	OPERATE_ON
-	TRIGGER_ACTION
-	std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+		OPERATE_ON
+		TRIGGER_ACTION
+		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
 	currentTime();
 	std::cout << "I(t) experiment is going on" << std::endl;
 	while (1) {
@@ -680,8 +803,8 @@ void Itmeas() {
 		float measTime = duration.count();
 		Sbuffer = reinterpret_cast<char const*>(buffer);
 		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
-		Sbuffer.erase(0,36);//remove 1st letters
-		outputFileName << measTime << "\t"<< Sbuffer << std::endl;
+		Sbuffer.erase(0, 36);//remove 1st letters
+		outputFileName << measTime << "\t" << Sbuffer << std::endl;
 		std::this_thread::sleep_for(std::chrono::seconds(ticktime));
 	}
 	OPERATE_OFF
@@ -853,7 +976,7 @@ void small_device_pulsed_mode() {
 
 		//read1
 		status = viWrite(instr, (ViBuf)"U11X", (ViUInt32)strlen("U11X"), &writeCount);
-		status = viRead(instr, buffer, 100, &retCount);	
+		status = viRead(instr, buffer, 100, &retCount);
 		Sbuffer = reinterpret_cast<char const*>(buffer);
 		Sbuffer.assign(Sbuffer, 3, 4);
 		dataToRead = std::stoi(Sbuffer);
@@ -871,7 +994,7 @@ void small_device_pulsed_mode() {
 			Sbuffer.replace(position, 1, "\n");
 			position = Sbuffer.find(",", position + 1);
 		}
-		Sbuffer.assign(Sbuffer,0,52);	//TODO instead of 52 refer to dataToRead
+		Sbuffer.assign(Sbuffer, 0, 52);	//TODO instead of 52 refer to dataToRead
 	//	std::cout << Sbuffer << std::endl;
 		outputFileName << Sbuffer;
 		temp3.assign(Sbuffer, 26, 12);
@@ -879,9 +1002,9 @@ void small_device_pulsed_mode() {
 		//FAILCHECK
 		temp1.assign(Sbuffer, 27, 7);
 		temp2.assign(Sbuffer, 36, 2);
-	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-	//	std::cout << "Read1 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
+		//	std::cout << "Read1 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 		if (failTestNum <= 0.00000099f) {	//Less than 1uA
 			while (!get_out) {
 				set_fail_counter++;
@@ -900,12 +1023,12 @@ void small_device_pulsed_mode() {
 				Sbuffer.assign(Sbuffer, 3, 4);
 				dataToRead = std::stoi(Sbuffer);
 				bytesToRead = dataToRead * 13;
-			//	std::cout << "Data to read: " << dataToRead << std::endl;
-			//	std::cout << "Bytes to read: " << bytesToRead << std::endl;
+				//	std::cout << "Data to read: " << dataToRead << std::endl;
+				//	std::cout << "Bytes to read: " << bytesToRead << std::endl;
 
 				status = viRead(instr, buffer, bytesToRead, &retCount);
-			//	std::cout << "retCount: " << retCount << " bytes" << std::endl;
-			//	std::cout << "Data read" << std::endl;
+				//	std::cout << "retCount: " << retCount << " bytes" << std::endl;
+				//	std::cout << "Data read" << std::endl;
 				Sbuffer = reinterpret_cast<char const*>(buffer);
 				//Format data into column
 				position = Sbuffer.find(",");
@@ -916,12 +1039,12 @@ void small_device_pulsed_mode() {
 				Sbuffer.assign(Sbuffer, 0, 78);
 				outputFileName << Sbuffer;
 				assist_forming_counter_file << i + 1 << " ";
-			//	std::cout << Sbuffer << std::endl;
+				//	std::cout << Sbuffer << std::endl;
 
 				temp1.assign(Sbuffer, 53, 7);
 				temp2.assign(Sbuffer, 62, 2);
 				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-			//	std::cout << "Read1 current after +5V help: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
+				//	std::cout << "Read1 current after +5V help: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 				if (failTestNum >= 0.00000099f) {
 					get_out = true;
 					temp3.assign(Sbuffer, 52, 12);
@@ -929,7 +1052,7 @@ void small_device_pulsed_mode() {
 				}
 				if (set_fail_counter >= 30 && enable_healing) {	//HEALING EXPERIMENTAL
 					std::cout << "Set Failed 30 times\nPerforming healing\n";
-					while (1){
+					while (1) {
 						status = viWrite(instr, (ViBuf)"L8E-4,7X", (ViUInt32)strlen("L8E-4,7X"), &writeCount);
 						status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,1000X", (ViUInt32)strlen("Q3,5,2,1,1000,1000X"), &writeCount);
 						status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
@@ -1009,7 +1132,7 @@ void small_device_pulsed_mode() {
 			std::this_thread::sleep_for(std::chrono::seconds(30));
 			std::cout << "30 Second pause\n";
 		}
-		
+
 		status = viWrite(instr, (ViBuf)"L3E-4,7X", (ViUInt32)strlen("L3E-4,7X"), &writeCount);	//CC Settings
 		status = viWrite(instr, (ViBuf)"Q3,5,2,1,400,1000X", (ViUInt32)strlen("Q3,5,2,1,400,1000X"), &writeCount);	//TODO modify reset voltage to possibly +4
 		status = viWrite(instr, (ViBuf)"Q9,0.3,2,1,500,500X", (ViUInt32)strlen("Q9,0.3,2,1,500,500X"), &writeCount);
@@ -1039,16 +1162,16 @@ void small_device_pulsed_mode() {
 		}
 		Sbuffer.assign(Sbuffer, 0, 52);
 		outputFileName << Sbuffer;
-	//	std::cout << Sbuffer << std::endl;
+		//	std::cout << Sbuffer << std::endl;
 
 		temp3.assign(Sbuffer, 26, 12);
 
 
 		temp1.assign(Sbuffer, 27, 7);
 		temp2.assign(Sbuffer, 36, 2);
-	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-	//	std::cout << "Read2 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
+		//	std::cout << "Read2 current: " << failTestNum << " Amps\n";	//for testing. check Sbuffers arrigns of temp1 and temp2 to debug;
 		if (failTestNum >= 0.00000019f) {	//More than 0.5uA
 			while (!get_out) {
 				std::cout << "Read2 threshold failed\n";
@@ -1084,14 +1207,14 @@ void small_device_pulsed_mode() {
 				Sbuffer.assign(Sbuffer, 0, 52);
 				outputFileName << Sbuffer;
 				assist_forming_counter_file << i + 1 << "R ";
-			//	std::cout << Sbuffer << std::endl;
+				//	std::cout << Sbuffer << std::endl;
 
 				temp3.assign(Sbuffer, 26, 12);
 				temp1.assign(Sbuffer, 27, 7);
 				temp2.assign(Sbuffer, 36, 2);
-			//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-			//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+				//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 				if (failTestNum <= 0.00000019f) {
 					get_out = true;
@@ -1101,7 +1224,7 @@ void small_device_pulsed_mode() {
 					std::cout << "Read2 threshold failed\n";
 					status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
 					status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
-					status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount); 
+					status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 					std::cout << "- - - - - - - Applied 50mA RESET- - - - - -\n\n";
 					std::this_thread::sleep_for(std::chrono::seconds(1));
 					std::this_thread::sleep_for(std::chrono::milliseconds(600));
@@ -1141,14 +1264,14 @@ void small_device_pulsed_mode() {
 					outputFileName << Sbuffer;
 
 					assist_forming_counter_file << i + 1 << "R ";
-				//	std::cout << Sbuffer << std::endl;
+					//	std::cout << Sbuffer << std::endl;
 
 					temp3.assign(Sbuffer, 0, 12);
 					temp1.assign(Sbuffer, 1, 7);
 					temp2.assign(Sbuffer, 10, 2);
-				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 					failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-				//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+					//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
@@ -1194,7 +1317,7 @@ void small_device_pulsed_mode() {
 						outputFileName << Sbuffer;
 
 						assist_forming_counter_file << i + 1 << "R ";
-					//	std::cout << Sbuffer << std::endl;
+						//	std::cout << Sbuffer << std::endl;
 
 						temp3.assign(Sbuffer, 0, 12);
 						temp1.assign(Sbuffer, 1, 7);
@@ -1202,7 +1325,7 @@ void small_device_pulsed_mode() {
 
 						//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 						failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-					//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+						//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
 
 						if (failTestNum <= 0.00000019f) {
 							get_out = true;
@@ -1273,7 +1396,7 @@ void small_device_pulsed_mode() {
 		readsFileName << "\t" << temp3 << std::endl;
 		assist_forming_counter_file << std::endl;
 		outputFileName.flush();
-		std::cout << " - - - - - - Run #" << i+1 << " out of " << amountOfRuns << " complete - - - - - - \n\n";
+		std::cout << " - - - - - - Run #" << i + 1 << " out of " << amountOfRuns << " complete - - - - - - \n\n";
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
@@ -1312,10 +1435,10 @@ void small_device_pulsed_mode_proper_forming() {
 	status = viWrite(instr, (ViBuf)"N0X", (ViUInt32)strlen("N0X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"R0X", (ViUInt32)strlen("R0X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"B0,0,0X", (ViUInt32)strlen("B0,0,0X"), &writeCount);
-//	status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings; not necessary here, but the instrument doesn't argue.
+	//	status = viWrite(instr, (ViBuf)"L0.1E-3,7X", (ViUInt32)strlen("L0.1E-3,7X"), &writeCount);	//CC Settings; not necessary here, but the instrument doesn't argue.
 	status = viWrite(instr, (ViBuf)"F0,1X", (ViUInt32)strlen("F0,1X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"G4,2,2X", (ViUInt32)strlen("G4,2,2X"), &writeCount);
-//	status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);	//create sweep
+	//	status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);	//create sweep
 	status = viWrite(instr, (ViBuf)"N1X", (ViUInt32)strlen("N1X"), &writeCount);
 	status = viWrite(instr, (ViBuf)"R1X", (ViUInt32)strlen("R1X"), &writeCount);
 	for (int i = 0; i < amountOfRuns; ++i) {
@@ -1324,9 +1447,9 @@ void small_device_pulsed_mode_proper_forming() {
 		status = viWrite(instr, (ViBuf)"Q9,-5,2,1,100,100X", (ViUInt32)strlen("Q3,-5,2,1,100,100X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		std::this_thread::sleep_for(std::chrono::seconds(1));
-	//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-		//read part 1
+			//read part 1
 		status = viRead(instr, buffer, 52, &retCount);
 		//std::cout << "retCount: " << retCount << " bytes" << std::endl;
 		//std::cout << "Data read" << std::endl;
@@ -1356,15 +1479,15 @@ void small_device_pulsed_mode_proper_forming() {
 		Sbuffer.assign(Sbuffer, 0, 26);
 		outputFileName << Sbuffer;
 
-	//	std::cout << Sbuffer << std::endl;
+		//	std::cout << Sbuffer << std::endl;
 
 		temp3.assign(Sbuffer, 0, 12);
 		temp1.assign(Sbuffer, 1, 7);
 		temp2.assign(Sbuffer, 10, 2);
-	//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
 		std::cout << "Read1 current: " << failTestNum << " Amps\n";
-		
+
 		/*							//TODO implement failproof
 		if (failTestNum <= 0.00000039f) {	//Less than 0.4uA
 			while (!get_out) {
@@ -1444,7 +1567,7 @@ void small_device_pulsed_mode_proper_forming() {
 				}
 			}
 		}
-		
+
 		/*		//CURRENT UP (not sure about it!)
 		if (failTestNum <= 0.00000999f ) {	//Less than 10uA
 			while (!get_out) {
@@ -1578,7 +1701,7 @@ void small_device_pulsed_mode_proper_forming() {
 		*/
 		readsFileName << temp3;
 		get_out = false;
-		
+
 		//COOLDOWN
 		if (failTestNum >= 0.000005) {	// >5uA then let it cool down
 			std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -1613,7 +1736,7 @@ void small_device_pulsed_mode_proper_forming() {
 		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,1000,500X", (ViUInt32)strlen("Q3,0.3,2,1,1000,500X"), &writeCount);
 		status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
 		std::this_thread::sleep_for(std::chrono::seconds(3));
-	//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 		status = viRead(instr, buffer, 26, &retCount);
 		Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -1689,7 +1812,7 @@ void small_device_pulsed_mode_proper_forming() {
 					get_out = true;
 					std::cout << "Read2 threshold passed with help1\n";
 				}
-				
+
 				else {	//help2
 					std::cout << "Read2 threshold failed\n";
 					status = viWrite(instr, (ViBuf)"L1E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
@@ -1748,7 +1871,7 @@ void small_device_pulsed_mode_proper_forming() {
 						std::cout << "Read2 threshold passed with help2\n";
 					}
 
-					
+
 					else {	//help3
 						std::cout << "Read2 threshold failed\n";
 						status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
@@ -1860,9 +1983,9 @@ void small_device_pulsed_mode_proper_forming() {
 						}
 					//	do end comment here
 					}
-					
+
 				}
-				
+
 			}
 			get_out = false;
 		}
@@ -1882,25 +2005,25 @@ void small_device_pulsed_mode_proper_forming() {
 void pulses_failure_assistSmart() {
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 	OPERATE_OFF
-	MODE_DC
-	TRIGGER_ACTION
-//	DATA_FORMAT_OUTPUT_TICK
-	set_dc_bias(4.0f,0);
-	setCurrentCompliance("4E-4",0);
+		MODE_DC
+		TRIGGER_ACTION
+		//	DATA_FORMAT_OUTPUT_TICK
+		set_dc_bias(4.0f, 0);
+	setCurrentCompliance("4E-4", 0);
 	OPERATE_ON
-	std::cout << "40 seconds forming ongoing" << std::endl;
+		std::cout << "40 seconds forming ongoing" << std::endl;
 	waitAndPrintProgress(40);
 	set_dc_bias(0.3f, 0);
 	std::cout << "10 seconds resting" << std::endl;
 	waitAndPrintProgress(10);
 	OPERATE_OFF
-	std::cout << "\nforming finished" << std::endl;
+		std::cout << "\nforming finished" << std::endl;
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 	set_dc_bias(0.0f, 0);
 }
 
 void test0_pulsed_modeSmart() {
-	std::cout << "Amount of runs?\n";
+	std::cout << "Amount of runs?\n>> ";
 	int amountOfRuns;
 	std::cin >> amountOfRuns;
 	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
@@ -1915,252 +2038,195 @@ void test0_pulsed_modeSmart() {
 	int position;
 	setCurrentCompliance("4E-4", 7);	//IMPORTANT if not here,the instrument starts saying PULSE TIME NOT MET
 	char cc_cur[10];
-	std::cout << "Compliance value? (default 4E-4)" << std::endl;
+	std::cout << "Compliance value? (default 4E-4)\n>> ";
 	std::cin >> cc_cur;
 	bool failcheckenable;
-	std::cout << "Enable failcheck? (1/0)" << std::endl;
+	std::cout << "Enable failcheck? (1/0)\n>> ";
 	std::cin >> failcheckenable;
 	set_dc_bias(0.0f, 0);
 	INTEGRATION_TIME_FAST
-	FILTER_DISABLE
-	OPERATE_OFF
-	TRIGGER_DISABLE
-	MODE_SWEEP
-	DATA_FORMAT_OUTPUT_SWEEP
-	OPERATE_ON
-	currentTime();
+		FILTER_DISABLE
+		OPERATE_OFF
+		TRIGGER_DISABLE
+		MODE_SWEEP
+		DATA_FORMAT_OUTPUT_SWEEP
+		OPERATE_ON
+		currentTime();
 	TRIGGER_ENABLE
-	for (int i = 0; i < amountOfRuns; ++i) {
-		setCurrentCompliance(cc_cur, 7);
-	//	status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
-		status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
-		TRIGGER_ACTION
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-			//read part 1
-		status = viRead(instr, buffer, 26, &retCount);
-		//std::cout << "retCount: " << retCount << " bytes" << std::endl;
-		//std::cout << "Data read" << std::endl;
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		//Format data into column
-		position = Sbuffer.find(",");
-		while (position != std::string::npos) {
-			Sbuffer.replace(position, 1, "\n");
-			position = Sbuffer.find(",", position + 1);
-		}
-		Sbuffer.assign(Sbuffer, 0, 26);
-		outputFileName << Sbuffer;
-		//read part 2
-		setCurrentCompliance("1E-3", 7);
-		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-		TRIGGER_ACTION
-		std::this_thread::sleep_for(std::chrono::seconds(1));
-		std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-		status = viRead(instr, buffer, 26, &retCount);
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		position = Sbuffer.find(",");
-		while (position != std::string::npos) {
-			Sbuffer.replace(position, 1, "\n");
-			position = Sbuffer.find(",", position + 1);
-		}
-		Sbuffer.assign(Sbuffer, 0, 26);
-		outputFileName << Sbuffer;
-
-		//	std::cout << Sbuffer << std::endl;
-
-		temp3.assign(Sbuffer, 0, 12);
-		temp1.assign(Sbuffer, 1, 7);
-		temp2.assign(Sbuffer, 10, 2);
-		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read1 current: " << failTestNum * (float)pow( 10, 6 ) << " uAmps\n";
-
-		if (failTestNum <= 0.00000079f && failcheckenable) {	//Less than 0.4uA
-			while (!get_out) {
-				std::cout << "Read1 threshold failed\n";
-				pulses_failure_assistSmart();
-				MODE_SWEEP
-				OPERATE_ON
-				assist_forming_counter_file << i + 1 << " ";
-				setCurrentCompliance(cc_cur, 7);
-	//		status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
-				status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
-				TRIGGER_ACTION
+		for (int i = 0; i < amountOfRuns; ++i) {
+			setCurrentCompliance(cc_cur, 7);
+			//	status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
+			status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
+			TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(1));
 			//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 				//read part 1
-				status = viRead(instr, buffer, 26, &retCount);
-				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
-				//std::cout << "Data read" << std::endl;
-				Sbuffer = reinterpret_cast<char const*>(buffer);
-				//Format data into column
-				position = Sbuffer.find(",");
-				while (position != std::string::npos) {
-					Sbuffer.replace(position, 1, "\n");
-					position = Sbuffer.find(",", position + 1);
-				}
-				Sbuffer.assign(Sbuffer, 0, 26);
-				outputFileName << Sbuffer;
-				//read part 2
-				setCurrentCompliance("1E-3", 7);
-				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-				TRIGGER_ACTION
+			status = viRead(instr, buffer, 26, &retCount);
+			//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+			//std::cout << "Data read" << std::endl;
+			Sbuffer = reinterpret_cast<char const*>(buffer);
+			//Format data into column
+			position = Sbuffer.find(",");
+			while (position != std::string::npos) {
+				Sbuffer.replace(position, 1, "\n");
+				position = Sbuffer.find(",", position + 1);
+			}
+			Sbuffer.assign(Sbuffer, 0, 26);
+			outputFileName << Sbuffer;
+			//read part 2
+			setCurrentCompliance("1E-3", 7);
+			status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+			TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(1));
-				std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-				status = viRead(instr, buffer, 26, &retCount);
-				Sbuffer = reinterpret_cast<char const*>(buffer);
-				position = Sbuffer.find(",");
-				while (position != std::string::npos) {
-					Sbuffer.replace(position, 1, "\n");
-					position = Sbuffer.find(",", position + 1);
-				}
-				Sbuffer.assign(Sbuffer, 0, 26);
-				outputFileName << Sbuffer;
+			status = viRead(instr, buffer, 26, &retCount);
+			Sbuffer = reinterpret_cast<char const*>(buffer);
+			position = Sbuffer.find(",");
+			while (position != std::string::npos) {
+				Sbuffer.replace(position, 1, "\n");
+				position = Sbuffer.find(",", position + 1);
+			}
+			Sbuffer.assign(Sbuffer, 0, 26);
+			outputFileName << Sbuffer;
 
-				//	std::cout << Sbuffer << std::endl;
+			//	std::cout << Sbuffer << std::endl;
 
-				temp3.assign(Sbuffer, 0, 12);
-				temp1.assign(Sbuffer, 1, 7);
-				temp2.assign(Sbuffer, 10, 2);
-				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read1 current: " << failTestNum * (float)pow(10, 6) << " uAmps\n";
+			temp3.assign(Sbuffer, 0, 12);
+			temp1.assign(Sbuffer, 1, 7);
+			temp2.assign(Sbuffer, 10, 2);
+			//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+			failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+			std::cout << "Read1 current: " << failTestNum * (float)pow(10, 6) << " uAmps\n";
 
-				if (failTestNum >= 0.00000099f) {
-					get_out = true;
-					std::cout << "Read1 threshold passed with help\n";
+			if (failTestNum <= 0.00000079f && failcheckenable) {	//Less than 0.4uA
+				while (!get_out) {
+					std::cout << "Read1 threshold failed\n";
+					pulses_failure_assistSmart();
+					MODE_SWEEP
+						OPERATE_ON
+						assist_forming_counter_file << i + 1 << " ";
+					setCurrentCompliance(cc_cur, 7);
+					//		status = viWrite(instr, (ViBuf)"Q3,5,2,1,500,100X", (ViUInt32)strlen("Q3,5,2,1,100,100X"), &writeCount);
+					status = viWrite(instr, (ViBuf)"Q3,-4,2,1,100,100X", (ViUInt32)strlen("Q3,-4,2,1,100,100X"), &writeCount);
+					TRIGGER_ACTION
+						std::this_thread::sleep_for(std::chrono::seconds(1));
+					//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+						//read part 1
+					status = viRead(instr, buffer, 26, &retCount);
+					//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+					//std::cout << "Data read" << std::endl;
+					Sbuffer = reinterpret_cast<char const*>(buffer);
+					//Format data into column
+					position = Sbuffer.find(",");
+					while (position != std::string::npos) {
+						Sbuffer.replace(position, 1, "\n");
+						position = Sbuffer.find(",", position + 1);
+					}
+					Sbuffer.assign(Sbuffer, 0, 26);
+					outputFileName << Sbuffer;
+					//read part 2
+					setCurrentCompliance("1E-3", 7);
+					status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+					TRIGGER_ACTION
+						std::this_thread::sleep_for(std::chrono::seconds(1));
+					std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+					status = viRead(instr, buffer, 26, &retCount);
+					Sbuffer = reinterpret_cast<char const*>(buffer);
+					position = Sbuffer.find(",");
+					while (position != std::string::npos) {
+						Sbuffer.replace(position, 1, "\n");
+						position = Sbuffer.find(",", position + 1);
+					}
+					Sbuffer.assign(Sbuffer, 0, 26);
+					outputFileName << Sbuffer;
+
+					//	std::cout << Sbuffer << std::endl;
+
+					temp3.assign(Sbuffer, 0, 12);
+					temp1.assign(Sbuffer, 1, 7);
+					temp2.assign(Sbuffer, 10, 2);
+					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+					failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+					std::cout << "Read1 current: " << failTestNum * (float)pow(10, 6) << " uAmps\n";
+
+					if (failTestNum >= 0.00000099f) {
+						get_out = true;
+						std::cout << "Read1 threshold passed with help\n";
+					}
 				}
 			}
-		}
 
-		readsFileName << temp3;
-		get_out = false;
+			readsFileName << temp3;
+			get_out = false;
 
-		//COOLDOWN
-		if (failTestNum >= 0.000005) {	// >5uA then let it cool down
-			std::this_thread::sleep_for(std::chrono::seconds(2));
-			std::cout << "2 Second pause\n";
-		}
+			//COOLDOWN
+			if (failTestNum >= 0.000005) {	// >5uA then let it cool down
+				std::this_thread::sleep_for(std::chrono::seconds(2));
+				std::cout << "2 Second pause\n";
+			}
 
-		setCurrentCompliance("1E-1", 9);
-		status = viWrite(instr, (ViBuf)"Q3,3.5,2,1,100,1000X", (ViUInt32)strlen("Q3,3.5,2,1,400,1000X"), &writeCount);	//TODO modify reset voltage to possibly +4
-		TRIGGER_ACTION
-		std::this_thread::sleep_for(std::chrono::seconds(2));
-		//std::this_thread::sleep_for(std::chrono::milliseconds(200));
+			setCurrentCompliance("1E-1", 9);
+			status = viWrite(instr, (ViBuf)"Q3,3.5,2,1,100,1000X", (ViUInt32)strlen("Q3,3.5,2,1,400,1000X"), &writeCount);	//TODO modify reset voltage to possibly +4
+			TRIGGER_ACTION
+				std::this_thread::sleep_for(std::chrono::seconds(2));
+			//std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-		//read part 1
+			//read part 1
 
-		status = viRead(instr, buffer, 26, &retCount);
-		//std::cout << "retCount: " << retCount << " bytes" << std::endl;
-		//std::cout << "Data read" << std::endl;
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		//Format data into column
-		position = Sbuffer.find(",");
-		while (position != std::string::npos) {
-			Sbuffer.replace(position, 1, "\n");
-			position = Sbuffer.find(",", position + 1);
-		}
-		Sbuffer.assign(Sbuffer, 0, 26);
-		outputFileName << Sbuffer;
+			status = viRead(instr, buffer, 26, &retCount);
+			//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+			//std::cout << "Data read" << std::endl;
+			Sbuffer = reinterpret_cast<char const*>(buffer);
+			//Format data into column
+			position = Sbuffer.find(",");
+			while (position != std::string::npos) {
+				Sbuffer.replace(position, 1, "\n");
+				position = Sbuffer.find(",", position + 1);
+			}
+			Sbuffer.assign(Sbuffer, 0, 26);
+			outputFileName << Sbuffer;
 
-		std::this_thread::sleep_for(std::chrono::seconds(1));
+			std::this_thread::sleep_for(std::chrono::seconds(1));
 
-		//read part 2
-		setCurrentCompliance("1E-6", 4);
-		status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-		TRIGGER_ACTION
-		std::this_thread::sleep_for(std::chrono::seconds(3));
-		//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-		status = viRead(instr, buffer, 26, &retCount);
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		position = Sbuffer.find(",");
-		while (position != std::string::npos) {
-			Sbuffer.replace(position, 1, "\n");
-			position = Sbuffer.find(",", position + 1);
-		}
-		Sbuffer.assign(Sbuffer, 0, 26);
-		outputFileName << Sbuffer;
-
-		//	std::cout << Sbuffer << std::endl;
-
-		temp3.assign(Sbuffer, 0, 12);
-		temp1.assign(Sbuffer, 1, 7);
-		temp2.assign(Sbuffer, 10, 2);
-		//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-		failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-		std::cout << "Read2 current: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
-
-		if (failTestNum >= 0.000000199f) {	//More than 0.2uA
-			while (!get_out) {
-				std::cout << "Read2 threshold failed\n";
-				setCurrentCompliance("1E-1", 9);
-				status = viWrite(instr, (ViBuf)"Q3,4,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
-				TRIGGER_ACTION
-				std::cout << "- - - - - - - Applied +4V RESET- - - - - -\n\n";
+			//read part 2
+			setCurrentCompliance("1E-6", 4);
+			status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+			TRIGGER_ACTION
 				std::this_thread::sleep_for(std::chrono::seconds(3));
-				//	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-					//read part 1
+			//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
-				status = viRead(instr, buffer, 26, &retCount);
-				//std::cout << "retCount: " << retCount << " bytes" << std::endl;
-				//std::cout << "Data read" << std::endl;
-				Sbuffer = reinterpret_cast<char const*>(buffer);
-				//Format data into column
-				position = Sbuffer.find(",");
-				while (position != std::string::npos) {
-					Sbuffer.replace(position, 1, "\n");
-					position = Sbuffer.find(",", position + 1);
-				}
-				Sbuffer.assign(Sbuffer, 0, 26);
-				outputFileName << Sbuffer;
+			status = viRead(instr, buffer, 26, &retCount);
+			Sbuffer = reinterpret_cast<char const*>(buffer);
+			position = Sbuffer.find(",");
+			while (position != std::string::npos) {
+				Sbuffer.replace(position, 1, "\n");
+				position = Sbuffer.find(",", position + 1);
+			}
+			Sbuffer.assign(Sbuffer, 0, 26);
+			outputFileName << Sbuffer;
 
-				//read part 2
-				setCurrentCompliance("1E-6", 4);
-				status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-				TRIGGER_ACTION
-				std::this_thread::sleep_for(std::chrono::seconds(3));
-				//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			//	std::cout << Sbuffer << std::endl;
 
-				status = viRead(instr, buffer, 26, &retCount);
-				Sbuffer = reinterpret_cast<char const*>(buffer);
-				position = Sbuffer.find(",");
-				while (position != std::string::npos) {
-					Sbuffer.replace(position, 1, "\n");
-					position = Sbuffer.find(",", position + 1);
-				}
-				Sbuffer.assign(Sbuffer, 0, 26);
-				outputFileName << Sbuffer;
+			temp3.assign(Sbuffer, 0, 12);
+			temp1.assign(Sbuffer, 1, 7);
+			temp2.assign(Sbuffer, 10, 2);
+			//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+			failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+			std::cout << "Read2 current: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
-				assist_forming_counter_file << i + 1 << "R ";
-				//	std::cout << Sbuffer << std::endl;
-
-				temp3.assign(Sbuffer, 0, 12);
-				temp1.assign(Sbuffer, 1, 7);
-				temp2.assign(Sbuffer, 10, 2);
-				//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-				failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-				std::cout << "Read2 current after +4V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
-
-				if (failTestNum <= 0.00000019f) {
-					get_out = true;
-					std::cout << "Read2 threshold passed with help1\n";
-				}
-				else {	//help2
+			if (failTestNum >= 0.000000199f) {	//More than 0.2uA
+				while (!get_out) {
 					std::cout << "Read2 threshold failed\n";
 					setCurrentCompliance("1E-1", 9);
-					status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
+					status = viWrite(instr, (ViBuf)"Q3,4,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
 					TRIGGER_ACTION
-					std::cout << "- - - - - - - Applied +5V RESET- - - - - -\n\n";
+						std::cout << "- - - - - - - Applied +4V RESET- - - - - -\n\n";
 					std::this_thread::sleep_for(std::chrono::seconds(3));
-					//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
-
-
-						//NEED 2 parts, so I don''t get "00.0...1"
+					//	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 						//read part 1
 
 					status = viRead(instr, buffer, 26, &retCount);
@@ -2180,7 +2246,7 @@ void test0_pulsed_modeSmart() {
 					setCurrentCompliance("1E-6", 4);
 					status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
 					TRIGGER_ACTION
-					std::this_thread::sleep_for(std::chrono::seconds(3));
+						std::this_thread::sleep_for(std::chrono::seconds(3));
 					//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 					status = viRead(instr, buffer, 26, &retCount);
@@ -2201,31 +2267,30 @@ void test0_pulsed_modeSmart() {
 					temp2.assign(Sbuffer, 10, 2);
 					//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
 					failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
-					std::cout << "Read2 current after +5V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
+					std::cout << "Read2 current after +4V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
 					if (failTestNum <= 0.00000019f) {
 						get_out = true;
-						std::cout << "Read2 threshold passed with help2\n";
+						std::cout << "Read2 threshold passed with help1\n";
 					}
-				}
-			}
-			get_out = false;
-		}
-/*
-					else {	//help3
+					else {	//help2
 						std::cout << "Read2 threshold failed\n";
-						status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
-						status = viWrite(instr, (ViBuf)"Q3,5,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
-						status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-						std::cout << "- - - - - - - Applied 50mA, 4V RESET- - - - - -\n\n";
+						setCurrentCompliance("1E-1", 9);
+						status = viWrite(instr, (ViBuf)"Q3,5,2,1,1000,200X", (ViUInt32)strlen("Q3,5,2,1,1000,200X"), &writeCount);
+						TRIGGER_ACTION
+							std::cout << "- - - - - - - Applied +5V RESET- - - - - -\n\n";
 						std::this_thread::sleep_for(std::chrono::seconds(3));
-					//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
+						//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
 
-						//read3
+							//NEED 2 parts, so I don''t get "00.0...1"
+							//read part 1
 
 						status = viRead(instr, buffer, 26, &retCount);
+						//std::cout << "retCount: " << retCount << " bytes" << std::endl;
+						//std::cout << "Data read" << std::endl;
 						Sbuffer = reinterpret_cast<char const*>(buffer);
+						//Format data into column
 						position = Sbuffer.find(",");
 						while (position != std::string::npos) {
 							Sbuffer.replace(position, 1, "\n");
@@ -2235,11 +2300,11 @@ void test0_pulsed_modeSmart() {
 						outputFileName << Sbuffer;
 
 						//read part 2
-						status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
+						setCurrentCompliance("1E-6", 4);
 						status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-						status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-						std::this_thread::sleep_for(std::chrono::seconds(3));
-					//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+						TRIGGER_ACTION
+							std::this_thread::sleep_for(std::chrono::seconds(3));
+						//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
 
 						status = viRead(instr, buffer, 26, &retCount);
 						Sbuffer = reinterpret_cast<char const*>(buffer);
@@ -2257,89 +2322,147 @@ void test0_pulsed_modeSmart() {
 						temp3.assign(Sbuffer, 0, 12);
 						temp1.assign(Sbuffer, 1, 7);
 						temp2.assign(Sbuffer, 10, 2);
-
 						//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-						failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-						std::cout << "Read2 current after 50mA RESET: " << failTestNum << " Amps\n";
+						failTestNum = std::stof(temp1, &sz) * (float)pow(10, -1 * std::stoi(temp2, &sz));
+						std::cout << "Read2 current after +5V RESET: " << failTestNum * (float)pow(10, 9) << " nAmps\n";
 
 						if (failTestNum <= 0.00000019f) {
 							get_out = true;
-							std::cout << "Read2 threshold passed with help3\n";
+							std::cout << "Read2 threshold passed with help2\n";
 						}
-						/*
-						else {	//help4
-							std::cout << "Read2 threshold failed\n";
-							status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
-							status = viWrite(instr, (ViBuf)"Q3,7,2,1,1000,200X", (ViUInt32)strlen("Q3,7,2,1,1000,200X"), &writeCount);
-							status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-							std::cout << "- - - - - - - Applied 50mA, 7V RESET- - - - - -\n\n";
-							std::this_thread::sleep_for(std::chrono::seconds(2));
+					}
+				}
+				get_out = false;
+			}
+			/*
+								else {	//help3
+									std::cout << "Read2 threshold failed\n";
+									status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
+									status = viWrite(instr, (ViBuf)"Q3,5,2,1,200,1000X", (ViUInt32)strlen("Q3,5,2,1,200,1000X"), &writeCount);
+									status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+									std::cout << "- - - - - - - Applied 50mA, 4V RESET- - - - - -\n\n";
+									std::this_thread::sleep_for(std::chrono::seconds(3));
+								//	std::this_thread::sleep_for(std::chrono::milliseconds(600));
 
 
-							//read3
+									//read3
 
-							status = viRead(instr, buffer, 26, &retCount);
-							Sbuffer = reinterpret_cast<char const*>(buffer);
-							position = Sbuffer.find(",");
-							while (position != std::string::npos) {
-								Sbuffer.replace(position, 1, "\n");
-								position = Sbuffer.find(",", position + 1);
+									status = viRead(instr, buffer, 26, &retCount);
+									Sbuffer = reinterpret_cast<char const*>(buffer);
+									position = Sbuffer.find(",");
+									while (position != std::string::npos) {
+										Sbuffer.replace(position, 1, "\n");
+										position = Sbuffer.find(",", position + 1);
+									}
+									Sbuffer.assign(Sbuffer, 0, 26);
+									outputFileName << Sbuffer;
+
+									//read part 2
+									status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
+									status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+									status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+									std::this_thread::sleep_for(std::chrono::seconds(3));
+								//	std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+									status = viRead(instr, buffer, 26, &retCount);
+									Sbuffer = reinterpret_cast<char const*>(buffer);
+									position = Sbuffer.find(",");
+									while (position != std::string::npos) {
+										Sbuffer.replace(position, 1, "\n");
+										position = Sbuffer.find(",", position + 1);
+									}
+									Sbuffer.assign(Sbuffer, 0, 26);
+									outputFileName << Sbuffer;
+
+									assist_forming_counter_file << i + 1 << "R ";
+									//	std::cout << Sbuffer << std::endl;
+
+									temp3.assign(Sbuffer, 0, 12);
+									temp1.assign(Sbuffer, 1, 7);
+									temp2.assign(Sbuffer, 10, 2);
+
+									//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+									failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+									std::cout << "Read2 current after 50mA RESET: " << failTestNum << " Amps\n";
+
+									if (failTestNum <= 0.00000019f) {
+										get_out = true;
+										std::cout << "Read2 threshold passed with help3\n";
+									}
+									/*
+									else {	//help4
+										std::cout << "Read2 threshold failed\n";
+										status = viWrite(instr, (ViBuf)"L5E-2,9X", (ViUInt32)strlen("L5E-2,9X"), &writeCount);	//CC Settings
+										status = viWrite(instr, (ViBuf)"Q3,7,2,1,1000,200X", (ViUInt32)strlen("Q3,7,2,1,1000,200X"), &writeCount);
+										status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+										std::cout << "- - - - - - - Applied 50mA, 7V RESET- - - - - -\n\n";
+										std::this_thread::sleep_for(std::chrono::seconds(2));
+
+
+										//read3
+
+										status = viRead(instr, buffer, 26, &retCount);
+										Sbuffer = reinterpret_cast<char const*>(buffer);
+										position = Sbuffer.find(",");
+										while (position != std::string::npos) {
+											Sbuffer.replace(position, 1, "\n");
+											position = Sbuffer.find(",", position + 1);
+										}
+										Sbuffer.assign(Sbuffer, 0, 26);
+										outputFileName << Sbuffer;
+
+										//read part 2
+										status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
+										status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
+										status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
+										std::this_thread::sleep_for(std::chrono::seconds(1));
+										std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+										status = viRead(instr, buffer, 26, &retCount);
+										Sbuffer = reinterpret_cast<char const*>(buffer);
+										position = Sbuffer.find(",");
+										while (position != std::string::npos) {
+											Sbuffer.replace(position, 1, "\n");
+											position = Sbuffer.find(",", position + 1);
+										}
+										Sbuffer.assign(Sbuffer, 0, 26);
+										outputFileName << Sbuffer;
+
+										assist_forming_counter_file << i + 1 << "R ";
+										//	std::cout << Sbuffer << std::endl;
+
+										temp3.assign(Sbuffer, 0, 12);
+										temp1.assign(Sbuffer, 1, 7);
+										temp2.assign(Sbuffer, 10, 2);
+
+										//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
+										failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
+										//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
+
+										if (failTestNum <= 0.00000019f) {
+											get_out = true;
+											std::cout << "Read2 threshold passed with help3\n";
+										}
+									}
+								//	do end comment here
+								}
+
 							}
-							Sbuffer.assign(Sbuffer, 0, 26);
-							outputFileName << Sbuffer;
 
-							//read part 2
-							status = viWrite(instr, (ViBuf)"L1E-6,4X", (ViUInt32)strlen("L1E-6,4X"), &writeCount);	//CC Settings
-							status = viWrite(instr, (ViBuf)"Q3,0.3,2,1,500,500X", (ViUInt32)strlen("Q3,0.3,2,1,500,500X"), &writeCount);
-							status = viWrite(instr, (ViBuf)"H0X", (ViUInt32)strlen("H0X"), &writeCount);
-							std::this_thread::sleep_for(std::chrono::seconds(1));
-							std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-							status = viRead(instr, buffer, 26, &retCount);
-							Sbuffer = reinterpret_cast<char const*>(buffer);
-							position = Sbuffer.find(",");
-							while (position != std::string::npos) {
-								Sbuffer.replace(position, 1, "\n");
-								position = Sbuffer.find(",", position + 1);
-							}
-							Sbuffer.assign(Sbuffer, 0, 26);
-							outputFileName << Sbuffer;
-
-							assist_forming_counter_file << i + 1 << "R ";
-							//	std::cout << Sbuffer << std::endl;
-
-							temp3.assign(Sbuffer, 0, 12);
-							temp1.assign(Sbuffer, 1, 7);
-							temp2.assign(Sbuffer, 10, 2);
-
-							//	std::cout << "temp1: " << temp1 << " temp2: " << temp2 << std::endl;
-							failTestNum = std::stof(temp1, &sz) * pow(10, -1 * std::stoi(temp2, &sz));
-							//	std::cout << "Read2 current after 4mA RESET: " << failTestNum << " Amps\n";
-
-							if (failTestNum <= 0.00000019f) {
-								get_out = true;
-								std::cout << "Read2 threshold passed with help3\n";
-							}
 						}
-					//	do end comment here
+						get_out = false;
+					}
+					else {
+						std::cout << "Read2 threshold passed\n";
 					}
 
-				}
-
-			}
-			get_out = false;
+					*/
+			readsFileName << "\t" << temp3 << std::endl;
+			assist_forming_counter_file << std::endl;
+			outputFileName.flush();
+			std::cout << " - - - - - - Run #" << i + 1 << " out of " << amountOfRuns << " complete - - - - - - \n\n";
+			std::this_thread::sleep_for(std::chrono::seconds(3));
 		}
-		else {
-			std::cout << "Read2 threshold passed\n";
-		}
-
-		*/
-		readsFileName << "\t" << temp3 << std::endl;
-		assist_forming_counter_file << std::endl;
-		outputFileName.flush();
-		std::cout << " - - - - - - Run #" << i + 1 << " out of " << amountOfRuns << " complete - - - - - - \n\n";
-		std::this_thread::sleep_for(std::chrono::seconds(3));
-	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
@@ -2475,7 +2598,7 @@ void test0pos() {
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
 }
 
-void smallDeviceForming(){
+void smallDeviceForming() {
 	float measTime;
 	float target;
 	bool next_step = false;
@@ -2551,15 +2674,16 @@ int main()
                               Keithley 237 automation protocol\n\
                                 Build: " << __DATE__ << " " << __TIME__ << "\n\
                                       Pavel Baikov\n" << std::endl;
-	connectDevice();
+	if (connectDevice()) displayHelp();
 
 	while (1) {
+		std::cout << ">> ";
 		std::cin >> userMessage;
 
 		if (userMessage == "status") {
 			displayStatus();
 		}
-		else if(userMessage == "connect") {
+		else if (userMessage == "connect") {
 			connectDevice();
 		}
 		else if (userMessage == "disconnect") {
@@ -2574,6 +2698,9 @@ int main()
 		}
 		else if (userMessage == "test2") {
 			IV_meas2();
+		}
+		else if (userMessage == "testspecial") {
+			IV_plus_steppedIV();
 		}
 		else if (userMessage == "testsmart") {
 			IV_measSmart();
@@ -2607,6 +2734,9 @@ int main()
 		}
 		else if (userMessage == "ivheat") {
 			IV_meas_thermal_Smart();
+		}
+		else if (userMessage == "help") {
+			displayHelp();
 		}
 		else if (userMessage == "exit") {
 			disconnectDevice();
