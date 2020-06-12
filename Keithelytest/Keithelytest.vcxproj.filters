@@ -18,5 +18,13 @@
     <ClCompile Include="Keithelytest.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Keithley237.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Keithley237.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

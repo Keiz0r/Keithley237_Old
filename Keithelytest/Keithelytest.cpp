@@ -1,40 +1,10 @@
-//NOTE: that is a "STATE MACHINE", so the change of states doesn't have to happen in exactly same order
 #define	_CRT_SECURE_NO_WARNINGS
-#include <iostream>
-#include "C:\Program Files (x86)\IVI Foundation\VISA\WinNT\Include\visa.h"
-#include <bitset>
-#include <string>
-#include <fstream>
-#include <iomanip>
-#include <thread>
-#include <chrono>
-#include <time.h>
-//#include "Instrument.h"
-#pragma comment( lib,"visa32" )
+#include "Keithley237.h"
 
-#define MODE_DC		                   writeToDevice("F0,0X");
-#define MODE_SWEEP	                   writeToDevice("F0,1X");
-#define DATA_FORMAT_OUTPUT_TICK        writeToDevice("G15,0,0X");
-#define DATA_FORMAT_OUTPUT_SWEEP       writeToDevice("G4,2,2X");
-#define TRIGGER_ACTION		           writeToDevice("H0X");
-#define OPERATE_OFF                    writeToDevice("N0X");
-#define OPERATE_ON	                   writeToDevice("N1X");
-#define FILTER_DISABLE		           writeToDevice("P0X");
-#define FILTER_2READINGS	           writeToDevice("P1X");
-#define FILTER_4READINGS	           writeToDevice("P2X");
-#define FILTER_8READINGS	           writeToDevice("P3X");
-#define FILTER_16READINGS	           writeToDevice("P4X");
-#define FILTER_32READINGS	           writeToDevice("P5X");
-#define TRIGGER_ENABLE                 writeToDevice("R1X");
-#define TRIGGER_DISABLE                writeToDevice("R0X");
-#define INTEGRATION_TIME_FAST          writeToDevice("S0X");	//  416 uSec |4-digit Resolution
-#define INTEGRATION_TIME_MEDIUM        writeToDevice("S1X");	//    4 mSec |5-digit Resolution
-#define INTEGRATION_TIME_LINECYCLE60HZ writeToDevice("S2X");	//16.67 mSec |5-digit Resolution
-#define INTEGRATION_TIME_LINECYCLE50HZ writeToDevice("S3X");	//   20 mSec |5-digit Resolution
-#define BUFFER_CLEAR				   memset(buffer, 0, sizeof buffer);
 std::string userMessage;
 
-static ViSession defaultRM, instr;
+static ViSession defaultRM;
+static ViSession instr;
 static ViStatus status;
 static ViUInt32 writeCount;
 static ViUInt32 retCount;
@@ -43,12 +13,6 @@ int dataToRead;
 int bytesToRead;
 static std::string Sbuffer;
 static const char* Devicename = "GPIB0::2::INSTR";
-
-void displayHelp() {
-	std::cout << "\nList of available functions:\n\nhelp - display help message\ntest2 - IV sweep (designed for big devices)\n\
-testspecial - IV + stepped IV (designed for big devices)\ntestsmart\ntest0neg\ntest0pos\ntest0pulse\nit - I(t) measurement\n\
-forming\nsdforming\nsdp\nsdppf\nivheat - IV sweep for oven (designed for small devices)\nexit - exit program\n" << std::endl;
-}
 
 void currentTime() {
 
@@ -2668,13 +2632,50 @@ void smallDeviceForming() {
 	std::cout << " - - - - - - Small device forming complete - - - - - - \n";
 }
 
+void MultipleLowVoltageIvs() {
+	char currentCompliance[10] = "5E-3";
+
+	std::string str2 = "Q2,-0.001,-0.3,3,0,400X";
+	std::string str4 = "Q2,0.001,0.3,3,0,400X";
+
+	std::string str3 = "Q8,-0.3,-0.001,3,0,400X";
+	std::string str5 = "Q8,0.3,0.001,3,0,400X";
+	int numpoints = 119;
+	int amountOfRuns = 1;
+	INTEGRATION_TIME_FAST
+	FILTER_DISABLE
+	OPERATE_OFF
+	TRIGGER_DISABLE
+	set_dc_bias(0.0f, 0);
+	MODE_SWEEP
+	//	status = viWrite(instr, (ViBuf)"M2,X", (ViUInt32)strlen("M2,X"), &writeCount);	//Mask to get end of sweep
+	DATA_FORMAT_OUTPUT_SWEEP
+	TRIGGER_ENABLE
+	setCurrentCompliance(currentCompliance, 0);
+	OPERATE_ON
+
+	for (int i = 0; i < amountOfRuns; ++i) {
+		std::cout << " - - - - - - Run #" << i + 1 << " of " << amountOfRuns << " - - - - - - " << std::endl;
+		writeToDevice(str2.c_str());
+		writeToDevice(str3.c_str());
+		TRIGGER_ACTION
+		readSmartFromDevice(numpoints * 2, true, 0.003f * 400, false);
+		writeToDevice(str4.c_str());
+		writeToDevice(str5.c_str());
+		TRIGGER_ACTION
+		readSmartFromDevice(numpoints * 2, true, 0.003f * 400, false);
+	}
+	std::cout << " - - - - - - Measurement complete - - - - - - \n";
+}
+
 int main()
 {
 	std::cout << "\n\
                               Keithley 237 automation protocol\n\
                                 Build: " << __DATE__ << " " << __TIME__ << "\n\
                                       Pavel Baikov\n" << std::endl;
-	if (connectDevice()) displayHelp();
+	Keithley237 kthley1;
+	if (connectDevice()) kthley1.displayHelp();
 
 	while (1) {
 		std::cout << ">> ";
@@ -2735,8 +2736,11 @@ int main()
 		else if (userMessage == "ivheat") {
 			IV_meas_thermal_Smart();
 		}
+		else if (userMessage == "Multiv") {
+			MultipleLowVoltageIvs();
+		}
 		else if (userMessage == "help") {
-			displayHelp();
+			kthley1.displayHelp();
 		}
 		else if (userMessage == "exit") {
 			disconnectDevice();
