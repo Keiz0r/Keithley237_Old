@@ -21,9 +21,18 @@
     <ClCompile Include="Keithley237.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="KeithleyScript.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Keithley237.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KeithleyScript.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Stockfucs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

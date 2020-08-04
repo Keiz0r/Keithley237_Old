@@ -1,6 +1,7 @@
 #include "Keithley237.h"
+#include "KeithleyScript.h"
 
-ViStatus Keithley237::writeToInstrument(const char* msg) {
+ViStatus Keithley237::writeToDevice(const char* msg) {
 	//"X" stands for Execute command all the time
 	//F0,0X - V/I source; DC/sweep mode (0/1)											page 3-27
 
@@ -32,8 +33,173 @@ ViStatus Keithley237::writeToInstrument(const char* msg) {
 	return status = viWrite(instr, (ViBuf)msg, (ViUInt32)strlen(msg), &writeCount);
 }
 
-void Keithley237::displayHelp() const {
-	std::cout << "\nList of available functions:\n\nhelp - display help message\ntest2 - IV sweep (designed for big devices)\n\
-testspecial - IV + stepped IV (designed for big devices)\ntestsmart\ntest0neg\ntest0pos\ntest0pulse\nit - I(t) measurement\n\
-forming\nsdforming\nsdp\nsdppf\nivheat - IV sweep for oven (designed for small devices)\nexit - exit program\n" << std::endl;
+Keithley237::Keithley237(const char* name)
+:
+	Devicename(name)
+{
+	connect();
+}
+
+Keithley237::~Keithley237() {
+	disconnect();
+}
+
+ViStatus Keithley237::connect() {
+	status = viOpenDefaultRM(&defaultRM);
+	if (status < VI_SUCCESS) {
+		std::cerr << "\nERROR Initializing VISA driver" << std::endl;
+	}
+	status = viOpen(defaultRM, Devicename.c_str(), VI_NULL, VI_NULL, &instr);
+	std::cout << "Connecting to instrument: " << Devicename << std::endl;
+	if (status < 0) {
+		std::cerr << "\n\n\n\n          >>>ERROR: Instrument not found<<<\n\n\n\n\n          Check connection and restart the proram" << std::endl;
+		return status;
+	}
+	else {
+		settings();	// Apply preset
+		return status;
+	}
+}
+
+void Keithley237::disconnect() {
+	status = viClose(instr);
+	status = viClose(defaultRM);
+	std::cout << "Disconnected instrument: " << Devicename << std::endl;
+}
+
+void Keithley237::readInstrumentBuffer() {
+	BUFFER_CLEAR
+	status = viRead(instr, buffer, sizeof(buffer), &retCount);
+	std::cout << "Message: " << buffer << std::endl;
+}
+
+std::string& Keithley237::readInstrumentBuffer(std::ofstream& file) {
+	status = viRead(instr, buffer, sizeof(buffer), &retCount);
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	//Format data into column
+	bool flipper = false;
+	int cntr = 1;
+	for (auto iter = Sbuffer.find(','); iter != std::string::npos; iter = Sbuffer.find(',')) {
+		if (!flipper) {
+			Sbuffer.replace(iter, 1, " ");
+		}
+		else {
+			Sbuffer.replace(iter, 1, "\n");
+		}
+		flipper = !flipper;
+		cntr++;
+	}
+	file << Sbuffer;
+	return Sbuffer;
+}
+
+void Keithley237::settings() {
+	status = viSetAttribute(instr, VI_ATTR_TMO_VALUE, 3000);	// Timeout value 3000 milliseconds (3sec)
+	std::cout << "Device preset done" << std::endl;
+	/*
+	status = viFlush(instr,VI_IO_IN_BUF);
+	status = viFlush(instr, VI_IO_OUT_BUF_DISCARD);
+	status = viSetBuf(instr, VI_IO_OUT_BUF, 200);
+	status = viSetBuf(instr, VI_IO_IN_BUF, 200);
+	status = viSetBuf(instr, VI_READ_BUF, 200);
+	status = viSetBuf(instr, VI_WRITE_BUF, 200);
+	*/
+}
+
+void Keithley237::set_dc_bias(float bias, int range) {
+	char Cmsg[15] = "B";
+	char Cvalue[15];
+	char Crange[4];
+	sprintf_s(Cvalue, "%0.3f", bias);
+	sprintf_s(Crange, "%i", range);
+	strcat_s(Cmsg, Cvalue);
+	strcat_s(Cmsg, ",");
+	strcat_s(Cmsg, Crange);
+	strcat_s(Cmsg, ",0X");	//wait time
+	writeToDevice(Cmsg);
+}
+
+void Keithley237::setCurrentCompliance(const char* value, int range) {
+	// Value as 5E-3
+	char Cmsg[15] = "L";
+	char Crange[4];
+	sprintf_s(Crange, "%i", range);
+	strcat_s(Cmsg, value);
+	strcat_s(Cmsg, ",");
+	strcat_s(Cmsg, Crange);
+	strcat_s(Cmsg, "X");
+	writeToDevice(Cmsg);
+}
+
+bool Keithley237::readFromInstrument(int data, bool wait, float wait_multiplier, bool do_analysis_of_RonRoff) {
+	if (wait) {
+		if (data < 0) {
+			data = data * -1;
+		}
+		std::cout << "Expecting to Read: " << data << " data points" << std::endl;
+		int time = (int)std::ceil(data * wait_multiplier);
+		Script::waitAndPrintProgress(time);
+	}
+	BUFFER_CLEAR
+	status = viRead(instr, buffer, sizeof(buffer), &retCount);
+	std::cout << "Read: " << (retCount - 1) / 13 << " data points;\t" << retCount << " bytes" << std::endl;
+	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	//Format data into column
+	int position = Sbuffer.find(",");
+	while (position != std::string::npos) {
+		Sbuffer.replace(position, 1, "\n");
+		position = Sbuffer.find(",", position + 1);
+	}
+
+	Sbuffer.assign(Sbuffer, 0, data * 13);
+	outputFileName << Sbuffer;
+
+	if (do_analysis_of_RonRoff) {
+		std::string::size_type sz;
+		float Ron = std::stof(Sbuffer.substr(2 * 13, 12), &sz);
+		float Roff = std::stof(Sbuffer.substr(43 * 13, 12), &sz);
+		std::cout << "\nON current = " << Ron * pow(10, 6) << " uA" << std::endl;
+		std::cout << "OFF current= " << Roff * pow(10, 6) << " uA" << std::endl;
+		std::cout << "Ron/Roff ratio= " << Ron / Roff << std::endl;
+		if ((Ron / Roff) < 3.0f) {
+			std::cout << "!!! Alert, failure encountered !!!  Ron/Roff < 3" << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+void Keithley237::readSweepFromInstrument(int data, bool wait){
+	if (wait) {
+		int time = (int)std::ceil(data * 0.0065f * 400);
+		Script::waitAndPrintProgress(time);
+	}
+	BUFFER_CLEAR
+	status = viRead(instr, buffer, sizeof(buffer), &retCount);
+	std::ofstream outputFileName("KeithOUT.txt", std::ios::app);
+	std::string outV(reinterpret_cast<char*>(buffer), std::strlen(reinterpret_cast<char*>(buffer)));
+	bool flipper = false;
+	int cntr = 1;
+	for (auto iter = outV.find(','); iter != std::string::npos; iter = outV.find(',')) {
+		if (!flipper) {
+			outV.replace(iter, 1, " ");
+		}
+		else {
+			outV.replace(iter, 1, "\n");
+		}
+		flipper = !flipper;
+		cntr++;
+	}
+	outputFileName << outV;
+	std::cout << "Read: " << cntr << " datapoints" << std::endl;
+}
+
+ViStatus Keithley237::setFlag(const char* flag) {
+	return status = viWrite(instr, (ViBuf)flag, (ViUInt32)strlen(flag), &writeCount);
+}
+
+void Keithley237::displayStatus() {
+	std::cout << "Status: " << status << std::endl;
+	std::cout << "Binary Status " << std::bitset<8>(status) << std::endl;
 }

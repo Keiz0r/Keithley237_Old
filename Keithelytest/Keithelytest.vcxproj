@@ -100,6 +100,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <SuppressStartupBanner>false</SuppressStartupBanner>
+      <AdditionalIncludeDirectories>C:\Program Files (x86)\IVI Foundation\VISA\WinNT\Include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -171,9 +172,12 @@
   <ItemGroup>
     <ClCompile Include="Keithley237.cpp" />
     <ClCompile Include="Keithelytest.cpp" />
+    <ClCompile Include="KeithleyScript.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Keithley237.h" />
+    <ClInclude Include="KeithleyScript.h" />
+    <ClInclude Include="Stockfucs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
