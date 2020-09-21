@@ -57,6 +57,7 @@ ViStatus Keithley237::connect() {
 	}
 	else {
 		settings();	// Apply preset
+		Script::displayHelp();
 		return status;
 	}
 }
@@ -195,11 +196,20 @@ void Keithley237::readSweepFromInstrument(int data, bool wait){
 	std::cout << "Read: " << cntr << " datapoints" << std::endl;
 }
 
+void Keithley237::readImmediateCurrentValue(std::ofstream& file) {
+	BUFFER_CLEAR
+	status = viRead(instr, buffer, sizeof(buffer), &retCount);
+	Sbuffer = reinterpret_cast<char const*>(buffer);
+	Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
+	Sbuffer.erase(0, 36);//remove 1st letters
+	file << Sbuffer;
+}
+
 ViStatus Keithley237::setFlag(const char* flag) {
 	return status = viWrite(instr, (ViBuf)flag, (ViUInt32)strlen(flag), &writeCount);
 }
 
-void Keithley237::displayStatus() {
+void Keithley237::displayStatus() const {
 	std::cout << "Status: " << status << std::endl;
 	std::cout << "Binary Status " << std::bitset<8>(status) << std::endl;
 }

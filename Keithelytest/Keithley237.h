@@ -7,7 +7,6 @@
 #include <iomanip>
 #include <thread>
 #include <chrono>
-#include <time.h>
 #pragma comment( lib,"visa32" )
 
 #define MODE_DC		                   "F0,0X"
@@ -45,8 +44,9 @@ public:
 	void setCurrentCompliance(const char* value, int range);
 	bool readFromInstrument(int data, bool wait, float wait_multiplier, bool do_analysis_of_RonRoff);
 	void readSweepFromInstrument(int data, bool wait);
+	void readImmediateCurrentValue(std::ofstream& file);
 	ViStatus setFlag(const char* flag);
-	void displayStatus();
+	void displayStatus() const;
 private:
 	void settings();
 private:

@@ -1,7 +1,16 @@
 #define	_CRT_SECURE_NO_WARNINGS
 #include "KeithleyScript.h"
+#include <time.h>
 
 static std::string userMessage;
+
+void currentTime() {
+	time_t rawtime;
+	tm* timeinfo;
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	std::cout << "Current local time and date: " << asctime(timeinfo) << std::endl;
+}
 
 int main()
 {
@@ -10,23 +19,21 @@ int main()
                                 Build: " << __DATE__ << " " << __TIME__ << "\n\
                                       Pavel Baikov\n" << std::endl;
 	Keithley237 kthley1("GPIB0::2::INSTR");
-//	if (connectDevice()) Script::displayHelp();
-	Script::displayHelp();	//This ruins other functions for now except IV
 
 	while (1) {
 		std::cout << ">> ";
 		std::cin >> userMessage;
 
-		if (userMessage == "status") {
+		if (userMessage == LABEL_KSCRIPT_STATUS) {
 			kthley1.displayStatus();
 		}
-		else if (userMessage == "connect") {
+		else if (userMessage == LABEL_KSCRIPT_CONNECT) {
 			kthley1.connect();
 		}
-		else if (userMessage == "disconnect") {
+		else if (userMessage == LABEL_KSCRIPT_DISCONNECT) {
 			kthley1.disconnect();
 		}
-		else if (userMessage == "write") {
+		else if (userMessage == LABEL_KSCRIPT_WRITETODEVICE) {
 			std::cin >> userMessage;
 			kthley1.writeToDevice(userMessage.c_str());
 		}
@@ -48,15 +55,19 @@ int main()
 	//	else if (userMessage == "test0pos") {
 	//		test0pos();
 	//	}
-		else if (userMessage == "pulse1") {
+		else if (userMessage == LABEL_KSCRIPT_PULSE1) {
 			Script::pulse_Script1(kthley1);
+		}
+		else if (userMessage == LABEL_KSCRIPT_PULSE2) {
+			//new 50x100device set -1V, reset +2V
+			Script::pulse_Script2(kthley1);
 		}
 		else if (userMessage == "disco") {
 			Script::playsong(kthley1);
 		}
-	//	else if (userMessage == "it") {
-	//		Itmeas();
-	//	}
+		else if (userMessage == LABEL_KSCRIPT_IT) {
+			Script::It_Script(kthley1);
+		}
 	//	else if (userMessage == "forming") {
 	//		forming();
 	//	}
@@ -72,13 +83,13 @@ int main()
 	//	else if (userMessage == "ivheat") {
 	//		IV_meas_thermal_Smart();
 	//	}
-	//	else if (userMessage == "Multiv") {
-	//		MultipleLowVoltageIvs();
-	//	}
+		else if (userMessage == "Multiv") {
+			Script::multipleLowVoltageIVs(kthley1);
+		}
 		else if (userMessage == "IV") {
 			Script::IV_Script1(kthley1);
 		}
-		else if (userMessage == "help") {
+		else if (userMessage == LABEL_KSCRIPT_DISPLAYHELP) {
 			Script::displayHelp();
 		}
 		else if (userMessage == "exit") {
@@ -87,6 +98,7 @@ int main()
 		else {
 			std::cout << "Wrong input\n";
 		}
+		currentTime();
 	}
 
 	return 0;

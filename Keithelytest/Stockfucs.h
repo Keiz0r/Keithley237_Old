@@ -1,29 +1,6 @@
 #pragma once
-
-
-static ViSession defaultRM;
-static ViSession instr;
-static ViStatus status;
-static ViUInt32 writeCount;
-static ViUInt32 retCount;
-static unsigned char buffer[10000];	// buffer size for data coming from the device
-int dataToRead;
-int bytesToRead;
-static std::string Sbuffer;
-static const char* Devicename = "GPIB0::2::INSTR";
-
-void currentTime() {
-
-	time_t rawtime;
-	struct tm* timeinfo;
-
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	printf("Current local time and date: %s", asctime(timeinfo));
-
-	std::this_thread::sleep_for(std::chrono::seconds(1));
-
-}
+#include <time.h>
+#include <iostream>
 
 bool waitForSweepEnd() {
 	status = viWrite(instr, (ViBuf)"U3X", (ViUInt32)strlen("U3X"), &writeCount);
@@ -562,65 +539,6 @@ void IV_meas_thermal_Smart() {
 			readSmartFromDevice((int)(Fpositive_limit / Fvoltage_Step) * 2, true, 0.0017f * FtimeStep, false);
 	}
 	std::cout << " - - - - - - Measurement complete - - - - - - \n";
-}
-
-void Itmeas() {
-	std::cout << "I(t) measurement mode\n";
-	std::cout << "Voltage?\n>> ";
-	char ItVoltage[10];
-	std::cin >> ItVoltage;
-	char str1[20] = "B";
-	char str2[6] = ",0,0X";
-	strcat_s(str1, ItVoltage);
-	strcat_s(str1, str2);
-	std::cout << "Compliance? XE-Y\n>> ";
-	char currentCompliance[10];
-	std::cin >> currentCompliance;
-	char str3[20] = "L";
-	char str4[4] = ",0X";
-	strcat_s(str3, currentCompliance);
-	strcat_s(str3, str4);
-	std::cout << "tick time? (measurement per x seconds)\n>> ";
-	int ticktime;
-	std::cin >> ticktime;
-
-	std::cout << "Apply filter? (1/0)\n>> ";
-	bool filterstate;
-	std::cin >> filterstate;
-	if (filterstate == true) {
-		INTEGRATION_TIME_LINECYCLE60HZ
-			FILTER_32READINGS
-			std::cout << "filtering is active" << std::endl;
-	}
-	else {
-		FILTER_DISABLE
-			INTEGRATION_TIME_FAST
-	}
-	std::ofstream outputFileName("KeithIt.txt", std::ios::app);
-	OPERATE_OFF
-		TRIGGER_DISABLE
-		MODE_DC
-		DATA_FORMAT_OUTPUT_TICK
-		writeToDevice(str1);
-	status = viWrite(instr, (ViBuf)str3, (ViUInt32)strlen(str3), &writeCount);	//CC Settings
-	TRIGGER_ENABLE
-		OPERATE_ON
-		TRIGGER_ACTION
-		std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
-	currentTime();
-	std::cout << "I(t) experiment is going on" << std::endl;
-	while (1) {
-		status = viRead(instr, buffer, 100, &retCount);
-		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-		std::chrono::duration<float> duration = now - start;
-		float measTime = duration.count();
-		Sbuffer = reinterpret_cast<char const*>(buffer);
-		Sbuffer.erase(Sbuffer.size() - 22);//remove last letters
-		Sbuffer.erase(0, 36);//remove 1st letters
-		outputFileName << measTime << "\t" << Sbuffer << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(ticktime));
-	}
-	OPERATE_OFF
 }
 
 void forming() {
